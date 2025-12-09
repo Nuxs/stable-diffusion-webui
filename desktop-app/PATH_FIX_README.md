@@ -109,3 +109,4 @@ stable-diffusion-webui/
 
 现在打包后的应用应该能够正确找到 WebUI 项目了！
 
+

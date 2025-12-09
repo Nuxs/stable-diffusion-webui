@@ -106,3 +106,4 @@ python create_installer.py
 - `window_width`: 窗口宽度（默认: 1200）
 - `window_height`: 窗口高度（默认: 800）
 
+

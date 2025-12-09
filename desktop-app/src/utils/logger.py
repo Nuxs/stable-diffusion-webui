@@ -35,3 +35,4 @@ def setup_logging(log_level=logging.INFO):
     logging.getLogger("PyQt6").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+

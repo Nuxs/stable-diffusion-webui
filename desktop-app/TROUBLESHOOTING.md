@@ -71,3 +71,4 @@ pip install PyQt6 PyQt6-WebEngine
 2. 在开发模式下运行并查看控制台输出
 3. 提供完整的错误信息和系统环境信息
 
+

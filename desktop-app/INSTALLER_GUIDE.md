@@ -93,3 +93,4 @@ desktop-app/dist/StableDiffusionWebUI/
 
 打包和安装程序配置已完成！
 
+

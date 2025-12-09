@@ -92,3 +92,4 @@ python src/main.py
 - 确保 Python 和 PyQt6 都是 64 位版本
 - 检查杀毒软件是否阻止了 DLL 加载
 
+

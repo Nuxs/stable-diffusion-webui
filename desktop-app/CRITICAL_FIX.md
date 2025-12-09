@@ -78,3 +78,4 @@ python fix_pyqt6_complete.bat
 python -c "from PyQt6.QtWidgets import QApplication; print('OK')"
 ```
 
+

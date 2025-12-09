@@ -34,3 +34,4 @@ _internal_path = os.path.join(os.path.dirname(app_dir), '_internal')
 if os.path.exists(_internal_path):
     os.environ['PATH'] = _internal_path + os.pathsep + os.environ.get('PATH', '')
 
+

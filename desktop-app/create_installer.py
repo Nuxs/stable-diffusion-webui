@@ -86,3 +86,4 @@ Filename: "{{app}}\\{{#AppExeName}}"; Description: "{{cm:LaunchProgram,{{#String
 if __name__ == "__main__":
     create_iss_script()
 
+

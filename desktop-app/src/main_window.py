@@ -12,10 +12,10 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QToolBar, QStatusBar, QProgressBar, QLabel, QMessageBox,
-    QMenuBar, QMenu, QAction
+    QMenuBar, QMenu
 )
 from PyQt6.QtCore import Qt, QUrl, QTimer, pyqtSignal
-from PyQt6.QtGui import QIcon, QAction as QGuiAction
+from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 
@@ -75,14 +75,14 @@ class MainWindow(QMainWindow):
         # 文件菜单
         file_menu = menubar.addMenu("文件(&F)")
         
-        open_browser_action = QGuiAction("在浏览器中打开", self)
+        open_browser_action = QAction("在浏览器中打开", self)
         open_browser_action.setShortcut("Ctrl+B")
         open_browser_action.triggered.connect(self.open_in_browser)
         file_menu.addAction(open_browser_action)
         
         file_menu.addSeparator()
         
-        exit_action = QGuiAction("退出(&X)", self)
+        exit_action = QAction("退出(&X)", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
@@ -90,24 +90,24 @@ class MainWindow(QMainWindow):
         # 视图菜单
         view_menu = menubar.addMenu("视图(&V)")
         
-        reload_action = QGuiAction("重新加载(&R)", self)
+        reload_action = QAction("重新加载(&R)", self)
         reload_action.setShortcut("F5")
         reload_action.triggered.connect(self.reload_page)
         view_menu.addAction(reload_action)
         
         view_menu.addSeparator()
         
-        zoom_in_action = QGuiAction("放大(&+)", self)
+        zoom_in_action = QAction("放大(&+)", self)
         zoom_in_action.setShortcut("Ctrl++")
         zoom_in_action.triggered.connect(self.zoom_in)
         view_menu.addAction(zoom_in_action)
         
-        zoom_out_action = QGuiAction("缩小(&-)", self)
+        zoom_out_action = QAction("缩小(&-)", self)
         zoom_out_action.setShortcut("Ctrl+-")
         zoom_out_action.triggered.connect(self.zoom_out)
         view_menu.addAction(zoom_out_action)
         
-        reset_zoom_action = QGuiAction("重置缩放(&0)", self)
+        reset_zoom_action = QAction("重置缩放(&0)", self)
         reset_zoom_action.setShortcut("Ctrl+0")
         reset_zoom_action.triggered.connect(self.reset_zoom)
         view_menu.addAction(reset_zoom_action)
@@ -115,18 +115,18 @@ class MainWindow(QMainWindow):
         # 服务器菜单
         server_menu = menubar.addMenu("服务器(&S)")
         
-        restart_action = QGuiAction("重启服务器(&R)", self)
+        restart_action = QAction("重启服务器(&R)", self)
         restart_action.triggered.connect(self.restart_server)
         server_menu.addAction(restart_action)
         
-        stop_action = QGuiAction("停止服务器(&S)", self)
+        stop_action = QAction("停止服务器(&S)", self)
         stop_action.triggered.connect(self.stop_server)
         server_menu.addAction(stop_action)
         
         # 帮助菜单
         help_menu = menubar.addMenu("帮助(&H)")
         
-        about_action = QGuiAction("关于(&A)", self)
+        about_action = QAction("关于(&A)", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
         
@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         self.addToolBar(toolbar)
         
         # 重新加载按钮
-        reload_action = QGuiAction("重新加载", self)
+        reload_action = QAction("重新加载", self)
         reload_action.setIcon(QIcon.fromTheme("view-refresh"))
         reload_action.triggered.connect(self.reload_page)
         toolbar.addAction(reload_action)
@@ -145,7 +145,7 @@ class MainWindow(QMainWindow):
         toolbar.addSeparator()
         
         # 在浏览器中打开按钮
-        browser_action = QGuiAction("在浏览器中打开", self)
+        browser_action = QAction("在浏览器中打开", self)
         browser_action.setIcon(QIcon.fromTheme("web-browser"))
         browser_action.triggered.connect(self.open_in_browser)
         toolbar.addAction(browser_action)
@@ -265,7 +265,13 @@ class MainWindow(QMainWindow):
         """在浏览器中打开"""
         if self.server_manager and self.server_manager.is_running():
             url = self.server_manager.get_url()
-            webbrowser.open(url)
+            if url:
+                webbrowser.open(url)
+            else:
+                # 如果 URL 未设置，尝试从端口构造
+                port = self.server_manager.get_port()
+                url = f"http://127.0.0.1:{port}"
+                webbrowser.open(url)
         else:
             QMessageBox.warning(
                 self,

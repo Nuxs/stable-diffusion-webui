@@ -72,3 +72,4 @@ except Exception as e:
     print("3. Python 和 PyQt6 架构不匹配（32位 vs 64位）")
     print("4. 系统环境问题")
 
+

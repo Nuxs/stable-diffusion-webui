@@ -100,3 +100,4 @@ desktop-app/
 2. 检查是否有其他错误消息
 3. 尝试重新安装 PyQt6: `pip uninstall PyQt6 PyQt6-WebEngine && pip install PyQt6 PyQt6-WebEngine`
 
+

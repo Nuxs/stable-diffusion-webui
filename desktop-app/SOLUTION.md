@@ -123,3 +123,4 @@ pip install --no-cache-dir PyQt6 PyQt6-WebEngine
 
 如果安装 VC++ Redistributable 后仍然无法运行，请提供 `check_dependencies.py` 的完整输出。
 
+

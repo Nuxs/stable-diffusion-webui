@@ -86,3 +86,4 @@ python -c "from PyQt6.QtWidgets import QApplication; print('Success!')"
 - Python 版本和系统信息
 - 错误消息的完整内容
 
+
