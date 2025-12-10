@@ -163,60 +163,18 @@ for other_dir in other_dirs:
                     datas.append((src_path, os.path.dirname(rel_path) if os.path.dirname(rel_path) != '.' else '.'))
         print(f"已添加目录: {other_dir}")
 
-# 打包 venv 环境（如果存在）
-# 注意：venv 环境非常大，打包会增加安装包大小
-venv_path = os.path.join(project_root, 'venv')
-if os.path.exists(venv_path):
-    print(f"发现 venv 环境，开始打包...")
-    venv_exclude_dirs = {
-        '__pycache__', '.git', 'Include', 'Lib\\test', 'Lib\\idlelib',
-        'Lib\\lib2to3', 'Lib\\distutils', 'Lib\\tkinter', 'Lib\\turtledemo',
-        'Scripts\\*.pyc', 'Scripts\\*.pyo'
-    }
-    venv_exclude_extensions = {'.pyc', '.pyo', '.pyd.cache'}
-    
-    # 打包 Python 解释器
-    python_exe = os.path.join(venv_path, 'Scripts', 'python.exe')
-    if os.path.exists(python_exe):
-        datas.append((python_exe, 'venv/Scripts'))
-        print("已添加 Python 解释器")
-    
-    # 打包 Scripts 目录（pip, activate 等）
-    scripts_dir = os.path.join(venv_path, 'Scripts')
-    if os.path.exists(scripts_dir):
-        for file in os.listdir(scripts_dir):
-            if not any(file.endswith(ext) for ext in venv_exclude_extensions):
-                src_path = os.path.join(scripts_dir, file)
-                if os.path.isfile(src_path):
-                    datas.append((src_path, 'venv/Scripts'))
-        print("已添加 Scripts 目录")
-    
-    # 打包 Lib 目录（Python 标准库和第三方包）
-    lib_dir = os.path.join(venv_path, 'Lib')
-    if os.path.exists(lib_dir):
-        # 打包 site-packages（第三方包）
-        site_packages = os.path.join(lib_dir, 'site-packages')
-        if os.path.exists(site_packages):
-            for root, dirs, files in os.walk(site_packages):
-                # 排除一些不必要的目录
-                dirs[:] = [d for d in dirs if d not in venv_exclude_dirs and not d.startswith('.')]
-                # 排除测试目录和文档
-                dirs[:] = [d for d in dirs if not d.endswith(('test', 'tests', 'doc', 'docs', '__pycache__'))]
-                
-                for file in files:
-                    if not any(file.endswith(ext) for ext in venv_exclude_extensions):
-                        src_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(src_path, site_packages)
-                        datas.append((src_path, os.path.join('venv/Lib/site-packages', os.path.dirname(rel_path)) if os.path.dirname(rel_path) != '.' else 'venv/Lib/site-packages'))
-            print("已添加 site-packages 目录")
-        
-        # 打包 Python 标准库（可选，因为 PyInstaller 已经包含了）
-        # 为了减小体积，我们可以不打包标准库，只打包第三方包
-        print("注意: Python 标准库已由 PyInstaller 包含，未单独打包")
-    
-    print(f"venv 环境打包完成")
-else:
-    print("警告: 未找到 venv 环境，打包后的应用需要用户安装 Python 和依赖")
+# 注意：venv环境不直接打包，使用分离式打包方案
+# venv将被压缩为7z格式，放在environment/venv.7z
+# 应用首次运行时会自动解压
+print("=" * 60)
+print("分离式打包方案")
+print("=" * 60)
+print("venv环境不直接打包到exe中（体积过大）")
+print("请使用以下步骤创建完整分发包：")
+print("1. 运行: python create_environment_package.py 创建环境包")
+print("2. 将 environment/venv.7z 复制到打包输出目录")
+print("3. 应用首次运行时会自动解压环境")
+print("=" * 60)
 
 print(f"已添加 {len([d for d in datas if isinstance(d, tuple) and len(d) == 2])} 个文件/目录到打包列表")
 
@@ -245,8 +203,26 @@ hiddenimports += [
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='PyInstaller')
 
+# 添加配置文件
+config_dir = os.path.join(spec_dir, 'config')
+if os.path.exists(config_dir):
+    for config_file in os.listdir(config_dir):
+        if config_file.endswith('.json'):
+            datas.append((os.path.join(config_dir, config_file), 'config'))
+    print(f"✓ 已添加配置文件")
+
+# 添加新的隐藏导入（重构后的模块）
+hiddenimports += [
+    'src.launcher',
+    'src.system_detector',
+    'src.download_manager',
+    'src.model_manager',
+    'src.first_run_wizard',
+    'src.utils.portable_python',
+]
+
 a = Analysis(
-    ['src/main.py'],
+    ['src/launcher.py'],  # 🔄 更新入口点：main.py -> launcher.py
     pathex=[],
     binaries=binaries,
     datas=datas,

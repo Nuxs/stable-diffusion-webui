@@ -30,9 +30,14 @@ def setup_pyqt6_dll_path():
             else:
                 # 目录模式：可执行文件所在目录
                 exe_dir = os.path.dirname(sys.executable)
+                internal_dir = os.path.join(exe_dir, '_internal')
                 dll_paths = [
+                    # 优先检查 _internal 目录（PyInstaller 目录模式的标准位置）
+                    os.path.join(internal_dir, 'PyQt6', 'Qt6', 'bin'),
+                    os.path.join(internal_dir, 'PyQt6', 'Qt6', 'bin'),  # 确保这个路径被检查
+                    internal_dir,  # _internal 目录本身
+                    # 也检查 exe 同级目录（某些配置可能将文件放在这里）
                     os.path.join(exe_dir, 'PyQt6', 'Qt6', 'bin'),
-                    os.path.join(exe_dir, '_internal'),
                     exe_dir,
                 ]
         else:
@@ -122,12 +127,63 @@ def setup_pyqt6_dll_path():
     except Exception as e:
         print(f"警告: 设置 PyQt6 DLL 路径时出错: {e}")
 
-# 执行 DLL 路径设置
+# 执行 DLL 路径设置 - 必须在导入 PyQt6 之前！
+# 这是最关键的一步，必须在任何 PyQt6 导入之前执行
 setup_pyqt6_dll_path()
 
+# 验证 DLL 路径是否设置成功（仅在打包模式下）
+if getattr(sys, 'frozen', False):
+    exe_dir = os.path.dirname(sys.executable)
+    internal_dir = os.path.join(exe_dir, '_internal')
+    qt6_bin = os.path.join(internal_dir, 'PyQt6', 'Qt6', 'bin')
+    if os.path.exists(qt6_bin):
+        # 再次确保路径已设置（双重保险）
+        current_path = os.environ.get('PATH', '')
+        if qt6_bin not in current_path:
+            os.environ['PATH'] = qt6_bin + os.pathsep + current_path
+            print(f"调试: 已再次添加 DLL 路径: {qt6_bin}")
+
 # 添加项目根目录到路径
-project_root = Path(__file__).parent.parent.parent
-desktop_app_root = Path(__file__).parent.parent
+# 在打包模式下，项目根目录应该在 exe 所在目录
+if getattr(sys, 'frozen', False):
+    # 打包模式：从 exe 所在目录查找项目根目录
+    if hasattr(sys, '_MEIPASS'):
+        # 单文件模式：_MEIPASS 是临时解压目录
+        exe_dir = Path(sys.executable).parent
+    else:
+        # 目录模式：exe 所在目录就是项目根目录（因为我们已经将项目文件打包到那里）
+        exe_dir = Path(sys.executable).parent
+    
+    # 在打包模式下，首先尝试设置运行时环境（分离式打包方案）
+    try:
+        from src.utils.environment_manager import setup_runtime_environment
+        python_exe = setup_runtime_environment(exe_dir)
+        if python_exe:
+            print(f"✓ 运行时环境已准备好: {python_exe}")
+    except Exception as e:
+        print(f"警告: 设置运行时环境时出错: {e}")
+        print("将尝试使用系统Python或项目venv")
+    
+    # 在打包模式下，stable-diffusion-webui 的核心文件应该在 exe 所在目录
+    # 检查是否存在 launch.py 或 webui.py 来确定项目根目录
+    if (exe_dir / "launch.py").exists() or (exe_dir / "webui.py").exists():
+        project_root = exe_dir
+    else:
+        # 如果不在 exe 目录，尝试在 _internal 目录查找（PyInstaller 目录模式）
+        internal_dir = exe_dir / "_internal"
+        if (internal_dir / "launch.py").exists() or (internal_dir / "webui.py").exists():
+            project_root = internal_dir
+        else:
+            # 如果都找不到，使用 exe 目录作为项目根目录
+            project_root = exe_dir
+            print(f"警告: 在打包模式下未找到 launch.py 或 webui.py，使用 {project_root} 作为项目根目录")
+    
+    desktop_app_root = exe_dir  # 在打包模式下，desktop-app 目录可能不存在
+else:
+    # 开发模式：使用原来的逻辑
+    project_root = Path(__file__).parent.parent.parent
+    desktop_app_root = Path(__file__).parent.parent
+
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(desktop_app_root))
 

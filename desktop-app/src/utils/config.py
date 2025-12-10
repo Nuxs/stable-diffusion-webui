@@ -33,6 +33,9 @@ class Config:
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
         self._config: Dict[str, Any] = self.load()
         
+        # 加载组件配置
+        self._load_components_config()
+        
     def load(self) -> Dict[str, Any]:
         """加载配置"""
         default_config = {
@@ -80,4 +83,36 @@ class Config:
     def set_port(self, port: int):
         """设置端口号"""
         self.set("port", port)
+    
+    def _load_components_config(self):
+        """加载组件配置（Python环境、模型等）"""
+        import sys
+        if getattr(sys, 'frozen', False):
+            components_file = Path(sys.executable).parent / "config" / "components.json"
+        else:
+            components_file = Path(__file__).parent.parent.parent / "config" / "components.json"
+        
+        self._components_config = {}
+        if components_file.exists():
+            try:
+                with open(components_file, 'r', encoding='utf-8') as f:
+                    self._components_config = json.load(f)
+            except Exception as e:
+                logger.error(f"加载组件配置失败: {e}")
+    
+    def get_python_environments(self) -> Dict[str, Dict]:
+        """获取所有 Python 环境配置"""
+        return self._components_config.get("python_environments", {})
+    
+    def get_models(self) -> Dict[str, Dict]:
+        """获取所有模型配置"""
+        return self._components_config.get("models", {})
+    
+    def get_dependencies(self) -> Dict[str, Dict]:
+        """获取依赖项配置"""
+        return self._components_config.get("dependencies", {})
+    
+    def get_webui_core(self) -> Dict:
+        """获取 WebUI 核心配置"""
+        return self._components_config.get("webui_core", {})
 

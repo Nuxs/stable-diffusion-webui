@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion WebUI - API参考</title>
+    <link rel="stylesheet" href="sd-docs-style.css">
+</head>
+<body>
+    <header>
+        <h1>Stable Diffusion WebUI 开发文档</h1>
+        <p>版本: 1.0 | 更新日期: 2024年11月</p>
+        <nav>
+            <ul>
+                <li><a href="sd-docs-overview.html">项目概述</a></li>
+                <li><a href="sd-docs-installation.html">安装指南</a></li>
+                <li><a href="sd-docs-usage.html">使用指南</a></li>
+                <li><a href="sd-docs-development.html">开发指南</a></li>
+                <li><a href="sd-docs-api.html" class="active">API参考</a></li>
+                <li><a href="sd-docs-troubleshooting.html">问题排查</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="api-overview">
+            <h2>1. API概述</h2>
+            
+            <h3>1.1 API介绍</h3>
+            <p>Stable Diffusion WebUI提供了一套完整的REST API，允许开发者通过HTTP请求与WebUI交互，无需使用Web界面。这使得开发者可以创建自己的前端应用程序、集成到现有系统中或构建自动化工具。</p>
+            
+            <h3>1.2 启用API</h3>
+            <p>默认情况下，API功能是禁用的。要启用API，您需要在启动WebUI时添加<code>--api</code>参数：</p>
+            <pre><code># Windows
+webui.bat --api
+
+# Linux/Mac
+./webui.sh --api</code></pre>
+            
+            <p>或者在webui-user.bat/sh中设置：</p>
+            <pre><code>set COMMANDLINE_ARGS=--api</code></pre>
+            
+            <h3>1.3 API基本URL</h3>
+            <p>API的基本URL为：</p>
+            <pre><code>http://localhost:7860/sdapi/v1/</code></pre>
+            
+            <p>如果您使用了不同的主机或端口，请相应地调整URL。</p>
+            
+            <div class="note">
+                <p><strong>注意</strong>：所有API响应都使用JSON格式。请确保在请求中设置适当的Content-Type头。</p>
+            </div>
+        </section>
+
+        <section id="endpoint-reference">
+            <h2>2. 端点参考</h2>
+            
+            <h3>2.1 文本到图像</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/txt2img</code></p>
+            <p><strong>方法</strong>: POST</p>
+            <p><strong>描述</strong>: 从文本提示词生成图像</p>
+            
+            <h4>请求参数：</h4>
+            <pre><code>{
+    "prompt": "一只可爱的猫咪",                 // 正面提示词
+    "negative_prompt": "模糊, 低质量",          // 负面提示词
+    "steps": 20,                              // 采样步数
+    "sampler_name": "Euler a",                // 采样器名称
+    "batch_size": 1,                          // 批次大小
+    "n_iter": 1,                              // 生成批次数
+    "cfg_scale": 7,                           // 提示词遵循度
+    "seed": -1,                               // 随机种子
+    "width": 512,                             // 图像宽度
+    "height": 512,                            // 图像高度
+    "restore_faces": false,                   // 是否修复面部
+    "tiling": false,                          // 是否生成可平铺图像
+    "enable_hr": false                        // 是否启用高分辨率修复
+}</code></pre>
+            
+            <h4>响应：</h4>
+            <pre><code>{
+    "images": ["base64编码的图像1", "base64编码的图像2", ...],
+    "parameters": { ... },   // 请求使用的参数
+    "info": "..."            // 生成信息的JSON字符串
+}</code></pre>
+            
+            <h3>2.2 图像到图像</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/img2img</code></p>
+            <p><strong>方法</strong>: POST</p>
+            <p><strong>描述</strong>: 基于输入图像生成新图像</p>
+            
+            <h4>请求参数：</h4>
+            <pre><code>{
+    "init_images": ["base64编码的输入图像"],    // 初始图像
+    "prompt": "一只可爱的猫咪",                 // 正面提示词
+    "negative_prompt": "模糊, 低质量",          // 负面提示词
+    "steps": 20,                              // 采样步数
+    "sampler_name": "Euler a",                // 采样器名称
+    "cfg_scale": 7,                           // 提示词遵循度
+    "denoising_strength": 0.75,               // 去噪强度
+    "seed": -1,                               // 随机种子
+    "width": 512,                             // 输出宽度
+    "height": 512                             // 输出高度
+}</code></pre>
+            
+            <h4>响应：</h4>
+            <pre><code>{
+    "images": ["base64编码的图像1", "base64编码的图像2", ...],
+    "parameters": { ... },   // 请求使用的参数
+    "info": "..."            // 生成信息的JSON字符串
+}</code></pre>
+            
+            <h3>2.3 获取模型列表</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/sd-models</code></p>
+            <p><strong>方法</strong>: GET</p>
+            <p><strong>描述</strong>: 获取可用的Stable Diffusion模型列表</p>
+            
+            <h4>响应：</h4>
+            <pre><code>[
+    {
+        "title": "v1-5-pruned-emaonly.safetensors",
+        "model_name": "v1-5-pruned-emaonly",
+        "hash": "81761151",
+        "sha256": "d0bee4db6ea80a4b1b36e14b961e3e1dd4cdc13b",
+        "filename": "v1-5-pruned-emaonly.safetensors"
+    },
+    // 更多模型...
+]</code></pre>
+            
+            <h3>2.4 设置当前模型</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/options</code></p>
+            <p><strong>方法</strong>: POST</p>
+            <p><strong>描述</strong>: 更改WebUI设置，包括当前使用的模型</p>
+            
+            <h4>请求参数：</h4>
+            <pre><code>{
+    "sd_model_checkpoint": "v1-5-pruned-emaonly.safetensors"
+}</code></pre>
+            
+            <h3>2.5 获取进度信息</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/progress</code></p>
+            <p><strong>方法</strong>: GET</p>
+            <p><strong>描述</strong>: 获取当前生成任务的进度</p>
+            
+            <h4>响应：</h4>
+            <pre><code>{
+    "progress": 0.5,                          // 0-1之间的进度值
+    "eta_relative": 10.5,                     // 预计剩余时间（秒）
+    "state": {
+        "skipped": false,                     // 是否跳过
+        "interrupted": false,                 // 是否被中断
+        "job": "...",                         // 当前任务
+        "job_count": 1,                       // 任务总数
+        "job_timestamp": "...",               // 任务时间戳
+        "job_no": 1,                          // 当前任务编号
+        "sampling_step": 10,                  // 当前采样步骤
+        "sampling_steps": 20                  // 总采样步骤
+    }
+}</code></pre>
+            
+            <h3>2.6 获取采样器列表</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/samplers</code></p>
+            <p><strong>方法</strong>: GET</p>
+            <p><strong>描述</strong>: 获取可用的采样器列表</p>
+            
+            <h4>响应：</h4>
+            <pre><code>[
+    {
+        "name": "Euler a",
+        "aliases": ["euler_ancestral", "k_euler_a"],
+        "options": {}
+    },
+    {
+        "name": "Euler",
+        "aliases": ["k_euler"],
+        "options": {}
+    },
+    // 更多采样器...
+]</code></pre>
+            
+            <h3>2.7 上传图像进行分析</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/png-info</code></p>
+            <p><strong>方法</strong>: POST</p>
+            <p><strong>描述</strong>: 从PNG图像中提取生成信息</p>
+            
+            <h4>请求参数：</h4>
+            <pre><code>{
+    "image": "base64编码的PNG图像"
+}</code></pre>
+            
+            <h4>响应：</h4>
+            <pre><code>{
+    "info": "生成信息，包括提示词、设置等"
+}</code></pre>
+            
+            <h3>2.8 调整图像</h3>
+            <p><strong>端点</strong>: <code>/sdapi/v1/extra-single-image</code></p>
+            <p><strong>方法</strong>: POST</p>
+            <p><strong>描述</strong>: 对图像应用超分辨率或其他后处理</p>
+            
+            <h4>请求参数：</h4>
+            <pre><code>{
+    "image": "base64编码的图像",
+    "resize_mode": 0,                         // 调整大小模式
+    "show_extras_results": true,              // 是否显示结果
+    "gfpgan_visibility": 0,                   // GFPGAN面部修复强度
+    "upscaling_resize": 2,                    // 放大倍数
+    "upscaling_resize_w": 1024,               // 目标宽度
+    "upscaling_resize_h": 1024,               // 目标高度
+    "upscaling_crop": true,                   // 是否裁剪
+    "upscaler_1": "ESRGAN_4x",                // 主要放大器
+    "upscaler_2": "None",                     // 次要放大器
+    "extras_upscaler_2_visibility": 0         // 次要放大器权重
+}</code></pre>
+            
+            <h4>响应：</h4>
+            <pre><code>{
+    "image": "base64编码的处理后图像",
+    "html_info": "..."                        // HTML格式的信息
+}</code></pre>
+        </section>
+
+        <section id="code-examples">
+            <h2>3. 代码示例</h2>
+            
+            <h3>3.1 Python示例</h3>
+            <p>以下是使用Python与API交互的示例：</p>
+            
+            <h4>3.1.1 文本到图像生成</h4>
+            <pre><code>import requests
+import io
+import base64
+from PIL import Image
+
+url = "http://localhost:7860/sdapi/v1/txt2img"
+
+payload = {
+    "prompt": "高质量照片，一只橙色的猫咪在窗台上，阳光照射，4k，细节丰富",
+    "negative_prompt": "模糊，低质量，错误的解剖结构",
+    "steps": 25,
+    "width": 512,
+    "height": 512,
+    "cfg_scale": 7,
+    "sampler_name": "DPM++ 2M Karras"
+}
+
+response = requests.post(url, json=payload)
+r = response.json()
+
+# 保存生成的图像
+for i, img_data in enumerate(r['images']):
+    image = Image.open(io.BytesIO(base64.b64decode(img_data)))
+    image.save(f"generated_image_{i}.png")
+    print(f"图像已保存为 generated_image_{i}.png")
+
+# 打印生成信息
+print("生成信息:")
+print(r['info'])</code></pre>
+            
+            <h4>3.1.2 图像到图像处理</h4>
+            <pre><code>import requests
+import io
+import base64
+from PIL import Image
+
+url = "http://localhost:7860/sdapi/v1/img2img"
+
+# 读取初始图像
+init_img = Image.open("input_image.jpg")
+buffer = io.BytesIO()
+init_img.save(buffer, format="PNG")
+init_img_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+payload = {
+    "init_images": [init_img_b64],
+    "prompt": "高质量照片，一只橙色的猫咪在窗台上，阳光照射，4k，细节丰富",
+    "negative_prompt": "模糊，低质量，错误的解剖结构",
+    "steps": 25,
+    "denoising_strength": 0.7,
+    "cfg_scale": 7,
+    "sampler_name": "Euler a"
+}
+
+response = requests.post(url, json=payload)
+r = response.json()
+
+# 保存生成的图像
+for i, img_data in enumerate(r['images']):
+    image = Image.open(io.BytesIO(base64.b64decode(img_data)))
+    image.save(f"processed_image_{i}.png")
+    print(f"图像已保存为 processed_image_{i}.png")</code></pre>
+            
+            <h4>3.1.3 切换模型</h4>
+            <pre><code>import requests
+
+url = "http://localhost:7860/sdapi/v1/options"
+
+# 首先获取可用模型列表
+models_response = requests.get("http://localhost:7860/sdapi/v1/sd-models")
+models = models_response.json()
+
+print("可用模型:")
+for i, model in enumerate(models):
+    print(f"{i+1}. {model['title']}")
+
+# 切换到特定模型
+model_name = models[0]['title']  # 使用第一个模型
+payload = {
+    "sd_model_checkpoint": model_name
+}
+
+response = requests.post(url, json=payload)
+print(f"已切换到模型: {model_name}")</code></pre>
+            
+            <h3>3.2 JavaScript示例</h3>
+            <p>以下是使用JavaScript与API交互的示例：</p>
+            
+            <h4>3.2.1 文本到图像生成</h4>
+            <pre><code>// 使用fetch API生成图像
+async function generateImage(prompt, negativePrompt) {
+    const response = await fetch('http://localhost:7860/sdapi/v1/txt2img', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            negative_prompt: negativePrompt,
+            steps: 25,
+            width: 512,
+            height: 512,
+            cfg_scale: 7,
+            sampler_name: "DPM++ 2M Karras"
+        })
+    });
+    
+    const result = await response.json();
+    return result;
+}
+
+// 使用示例
+generateImage(
+    "高质量照片，一只橙色的猫咪在窗台上，阳光照射，4k，细节丰富", 
+    "模糊，低质量，错误的解剖结构"
+).then(result => {
+    // 在浏览器中显示图像
+    const img = document.createElement('img');
+    img.src = `data:image/png;base64,${result.images[0]}`;
+    document.body.appendChild(img);
+    
+    console.log('图像生成成功!');
+}).catch(error => {
+    console.error('生成失败:', error);
+});</code></pre>
+            
+            <h4>3.2.2 获取生成进度</h4>
+            <pre><code>// 轮询进度
+function pollProgress() {
+    const progressElement = document.getElementById('progress');
+    
+    const checkProgress = async () => {
+        try {
+            const response = await fetch('http://localhost:7860/sdapi/v1/progress');
+            const data = await response.json();
+            
+            const progressPercent = Math.round(data.progress * 100);
+            progressElement.textContent = `进度: ${progressPercent}% (步骤 ${data.state.sampling_step}/${data.state.sampling_steps})`;
+            
+            if (data.progress < 1.0 && !data.state.interrupted && !data.state.skipped) {
+                setTimeout(checkProgress, 500);
+            } else {
+                progressElement.textContent = '生成完成!';
+            }
+        } catch (error) {
+            console.error('获取进度失败:', error);
+            progressElement.textContent = '无法获取进度';
+        }
+    };
+    
+    checkProgress();
+}</code></pre>
+            
+            <h3>3.3 CURL示例</h3>
+            <p>以下是使用CURL命令行工具与API交互的示例：</p>
+            
+            <h4>3.3.1 文本到图像生成</h4>
+            <pre><code>curl -X POST http://localhost:7860/sdapi/v1/txt2img \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "高质量照片，一只橙色的猫咪在窗台上，阳光照射，4k，细节丰富",
+    "negative_prompt": "模糊，低质量，错误的解剖结构",
+    "steps": 25,
+    "width": 512,
+    "height": 512,
+    "cfg_scale": 7,
+    "sampler_name": "DPM++ 2M Karras"
+  }' \
+  > response.json</code></pre>
+            
+            <p>然后从响应中提取图像：</p>
+            <pre><code>python -c "import json, base64; 
+open('generated_image.png', 'wb').write(
+    base64.b64decode(json.load(open('response.json'))['images'][0])
+)"</code></pre>
+        </section>
+
+        <section id="api-authentication">
+            <h2>4. API认证</h2>
+            
+            <h3>4.1 启用基本认证</h3>
+            <p>为了保护您的API不被未授权访问，您可以启用基本认证：</p>
+            <pre><code># Windows
+webui.bat --api --gradio-auth username:password
+
+# Linux/Mac
+./webui.sh --api --gradio-auth username:password</code></pre>
+            
+            <h3>4.2 使用认证发送请求</h3>
+            <p>启用认证后，您需要在请求中包含认证信息：</p>
+            
+            <h4>Python示例</h4>
+            <pre><code>import requests
+import base64
+from requests.auth import HTTPBasicAuth
+
+url = "http://localhost:7860/sdapi/v1/txt2img"
+auth = HTTPBasicAuth('username', 'password')
+
+response = requests.post(url, json=payload, auth=auth)</code></pre>
+            
+            <h4>CURL示例</h4>
+            <pre><code>curl -X POST http://localhost:7860/sdapi/v1/txt2img \
+  -H "Content-Type: application/json" \
+  -u username:password \
+  -d '{"prompt": "cat", "steps": 5}'</code></pre>
+        </section>
+
+        <section id="api-limitations">
+            <h2>5. API限制和注意事项</h2>
+            
+            <h3>5.1 性能考虑</h3>
+            <ul>
+                <li>与WebUI相同，API操作受限于您的硬件性能，特别是GPU能力</li>
+                <li>高分辨率图像生成和复杂操作可能需要较长时间</li>
+                <li>生成大型图像或使用大量步数可能导致VRAM不足问题</li>
+            </ul>
+            
+            <h3>5.2 并发请求</h3>
+            <p>默认情况下，WebUI一次只能处理一个生成请求。尝试同时发送多个请求将导致后续请求排队等待。</p>
+            
+            <h3>5.3 图像大小限制</h3>
+            <p>处理大量或大尺寸图像可能受到内存和网络传输限制。在处理大型图像时，请考虑以下几点：</p>
+            <ul>
+                <li>对于大型图像，请使用压缩或降低质量的图像格式</li>
+                <li>考虑在客户端进行图像缩放，然后使用API进行处理</li>
+                <li>小心处理base64编码的图像数据，可能会占用大量内存</li>
+            </ul>
+            
+            <h3>5.4 安全性考虑</h3>
+            <div class="warning">
+                <p><strong>警告</strong>：如果在公共网络上暴露API，请确保：</p>
+                <ul>
+                    <li>启用认证（--gradio-auth）</li>
+                    <li>考虑使用反向代理和HTTPS</li>
+                    <li>实施速率限制以防止滥用</li>
+                    <li>仅公开必要的端点</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="advanced-api-usage">
+            <h2>6. 高级API使用</h2>
+            
+            <h3>6.1 批量处理</h3>
+            <p>您可以通过修改请求参数来执行批量生成：</p>
+            <pre><code>{
+    "prompt": "一只可爱的猫咪",
+    "batch_size": 4,     // 每次生成4张图
+    "n_iter": 2          // 运行2批
+    // 其他参数...
+}</code></pre>
+            
+            <h3>6.2 使用ControlNet</h3>
+            <p>如果安装了ControlNet扩展，您可以通过API使用它：</p>
+            <pre><code>{
+    "prompt": "一只可爱的猫咪",
+    // 其他标准参数...
+    
+    "alwayson_scripts": {
+        "controlnet": {
+            "args": [
+                {
+                    "input_image": "base64编码的控制图像",
+                    "module": "canny",            // 预处理器
+                    "model": "control_v11p_sd15_canny",  // 模型名称
+                    "weight": 0.8,                // 控制权重
+                    "resize_mode": 1,             // 调整大小模式
+                    "control_mode": 0             // 控制模式
+                }
+            ]
+        }
+    }
+}</code></pre>
+            
+            <h3>6.3 使用LoRA</h3>
+            <p>您可以在提示词中使用LoRA：</p>
+            <pre><code>{
+    "prompt": "一只可爱的猫咪，&lt;lora:cat_lora:0.7&gt;",
+    // 其他参数...
+}</code></pre>
+            
+            <h3>6.4 自定义扩展API</h3>
+            <p>许多扩展会提供自己的API端点。您可以通过访问<code>/docs</code>页面来查看所有可用的API端点：</p>
+            <pre><code>http://localhost:7860/docs</code></pre>
+        </section>
+        
+        <section id="api-troubleshooting">
+            <h2>7. API问题排查</h2>
+            
+            <h3>7.1 常见错误</h3>
+            <table>
+                <tr>
+                    <th>错误</th>
+                    <th>可能原因</th>
+                    <th>解决方案</th>
+                </tr>
+                <tr>
+                    <td>Connection Refused</td>
+                    <td>API未启用或使用了错误的端口</td>
+                    <td>确保使用--api参数启动WebUI</td>
+                </tr>
+                <tr>
+                    <td>401 Unauthorized</td>
+                    <td>认证失败</td>
+                    <td>检查用户名和密码</td>
+                </tr>
+                <tr>
+                    <td>CUDA out of memory</td>
+                    <td>请求的图像尺寸或批次太大</td>
+                    <td>减小图像尺寸或批次大小</td>
+                </tr>
+                <tr>
+                    <td>404 Not Found</td>
+                    <td>端点URL错误或使用了不存在的功能</td>
+                    <td>检查URL和API版本</td>
+                </tr>
+                <tr>
+                    <td>Timeout Error</td>
+                    <td>请求处理时间过长</td>
+                    <td>增加客户端超时设置</td>
+                </tr>
+            </table>
+            
+            <h3>7.2 检查API状态</h3>
+            <p>您可以通过以下端点检查API状态：</p>
+            <pre><code>http://localhost:7860/healthcheck</code></pre>
+            <p>如果API运行正常，将返回"OK"。</p>
+            
+            <h3>7.3 调试技巧</h3>
+            <ul>
+                <li>使用<code>/docs</code>端点查看完整的API文档</li>
+                <li>启用详细日志记录来跟踪API请求：<code>--api-log</code></li>
+                <li>使用工具如Postman或Insomnia测试API请求</li>
+                <li>检查WebUI控制台输出，查找错误消息</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2024 Stable Diffusion WebUI文档 | <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank">官方GitHub仓库</a></p>
+    </footer>
+</body>
+</html> 

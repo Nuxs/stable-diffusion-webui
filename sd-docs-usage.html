@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion WebUI - 使用指南</title>
+    <link rel="stylesheet" href="sd-docs-style.css">
+</head>
+<body>
+    <header>
+        <h1>Stable Diffusion WebUI 开发文档</h1>
+        <p>版本: 1.0 | 更新日期: 2024年11月</p>
+        <nav>
+            <ul>
+                <li><a href="sd-docs-overview.html">项目概述</a></li>
+                <li><a href="sd-docs-installation.html">安装指南</a></li>
+                <li><a href="sd-docs-usage.html" class="active">使用指南</a></li>
+                <li><a href="sd-docs-development.html">开发指南</a></li>
+                <li><a href="sd-docs-api.html">API参考</a></li>
+                <li><a href="sd-docs-troubleshooting.html">问题排查</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="basic-usage">
+            <h2>1. 基本使用</h2>
+            
+            <h3>1.1 启动WebUI</h3>
+            <p>完成安装后，您可以通过以下方式启动WebUI：</p>
+            
+            <h4>Windows系统</h4>
+            <p>运行项目根目录中的<code>webui.bat</code>文件。</p>
+            
+            <h4>Linux/macOS系统</h4>
+            <p>在终端中执行：</p>
+            <pre><code>cd /path/to/stable-diffusion-webui
+./webui.sh</code></pre>
+            
+            <p>首次启动时，WebUI会下载必要的依赖和模型（如果尚未下载）。启动完成后，您可以通过浏览器访问：<a href="http://localhost:7860" target="_blank">http://localhost:7860</a></p>
+            
+            <div class="tip">
+                <p><strong>提示</strong>：您可以通过启动参数自定义WebUI的行为，例如：</p>
+                <ul>
+                    <li><code>--listen</code> - 允许从其他设备访问</li>
+                    <li><code>--port 7861</code> - 更改端口号</li>
+                    <li><code>--theme dark</code> - 使用暗色主题</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="text-to-image">
+            <h2>2. 文本到图像生成</h2>
+            
+            <h3>2.1 基本提示词</h3>
+            <p>文本到图像是Stable Diffusion的核心功能。在"文生图"选项卡中，输入您的提示词来生成图像：</p>
+            
+            <div class="note">
+                <p><strong>示例提示词</strong>：一只可爱的猫咪，坐在窗台上，阳光照射，高细节，柔和的光线，8k，照片级真实感</p>
+            </div>
+            
+            <h3>2.2 提示词语法</h3>
+            <p>WebUI支持以下提示词语法：</p>
+            <table>
+                <tr>
+                    <th>语法</th>
+                    <th>作用</th>
+                    <th>示例</th>
+                </tr>
+                <tr>
+                    <td>(文本)</td>
+                    <td>增强权重(1.1倍)</td>
+                    <td>(高质量)</td>
+                </tr>
+                <tr>
+                    <td>((文本))</td>
+                    <td>更强权重(1.21倍)</td>
+                    <td>((细节丰富))</td>
+                </tr>
+                <tr>
+                    <td>[文本]</td>
+                    <td>降低权重(0.9倍)</td>
+                    <td>[模糊背景]</td>
+                </tr>
+                <tr>
+                    <td>文本:数值</td>
+                    <td>精确权重控制</td>
+                    <td>猫咪:1.2, 橙色:0.8</td>
+                </tr>
+                <tr>
+                    <td>AND</td>
+                    <td>分隔不同的概念</td>
+                    <td>猫咪 AND 狗狗</td>
+                </tr>
+            </table>
+            
+            <h3>2.3 负面提示词</h3>
+            <p>负面提示词告诉模型需要避免生成的内容：</p>
+            <div class="note">
+                <p><strong>常用负面提示词</strong>：模糊, 低质量, 变形, 畸形, 不自然姿势, 额外的四肢, 低分辨率, 最差质量, 错误的手指</p>
+            </div>
+            
+            <h3>2.4 关键参数</h3>
+            <table>
+                <tr>
+                    <th>参数</th>
+                    <th>说明</th>
+                    <th>推荐值</th>
+                </tr>
+                <tr>
+                    <td>采样方法(Sampler)</td>
+                    <td>生成图像的算法</td>
+                    <td>Euler a, DPM++ 2M Karras</td>
+                </tr>
+                <tr>
+                    <td>采样步数(Steps)</td>
+                    <td>生成过程的迭代次数</td>
+                    <td>20-30步</td>
+                </tr>
+                <tr>
+                    <td>CFG Scale</td>
+                    <td>提示词遵循度</td>
+                    <td>7-12</td>
+                </tr>
+                <tr>
+                    <td>种子(Seed)</td>
+                    <td>随机数种子，-1为随机</td>
+                    <td>-1 (随机)</td>
+                </tr>
+                <tr>
+                    <td>宽度/高度</td>
+                    <td>输出图像尺寸</td>
+                    <td>512x512, 768x768</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="image-to-image">
+            <h2>3. 图像到图像处理</h2>
+            
+            <h3>3.1 基本用法</h3>
+            <p>图生图功能可以从现有图像出发，生成新的变体或进行修改：</p>
+            <ol>
+                <li>切换到"图生图"选项卡</li>
+                <li>上传一张源图像</li>
+                <li>输入提示词</li>
+                <li>调整重绘强度(Denoising strength)：
+                    <ul>
+                        <li>0.3-0.5: 保留更多原始图像细节</li>
+                        <li>0.7-0.9: 更大程度的改变</li>
+                    </ul>
+                </li>
+                <li>点击"生成"</li>
+            </ol>
+            
+            <h3>3.2 局部重绘(Inpainting)</h3>
+            <p>重绘功能允许您选择性地只修改图像的特定区域：</p>
+            <ol>
+                <li>切换到"重绘"选项卡</li>
+                <li>上传图像</li>
+                <li>使用画笔工具标记需要重绘的区域</li>
+                <li>输入描述您希望在该区域生成内容的提示词</li>
+                <li>调整遮罩模糊度(Mask blur)和重绘填充方式</li>
+                <li>点击"生成"</li>
+            </ol>
+            
+            <div class="tip">
+                <p><strong>提示</strong>：重绘功能非常适合修复图像的特定部分，如替换背景、修改物体或移除不需要的元素。</p>
+            </div>
+        </section>
+
+        <section id="models-and-extensions">
+            <h2>4. 模型与扩展</h2>
+            
+            <h3>4.1 模型管理</h3>
+            <p>WebUI支持多种类型的模型，这些模型应放置在相应的目录中：</p>
+            <ul>
+                <li><strong>检查点模型</strong>：放在 <code>models/Stable-diffusion/</code> 目录下，是生成图像的主要模型</li>
+                <li><strong>LoRA模型</strong>：放在 <code>models/Lora/</code> 目录下，用于微调生成的风格和内容</li>
+                <li><strong>VAE模型</strong>：放在 <code>models/VAE/</code> 目录下，改善图像的色彩和细节</li>
+                <li><strong>Textual Inversion</strong>：放在 <code>embeddings/</code> 目录下，用于学习特定的概念或风格</li>
+            </ul>
+            
+            <h3>4.2 添加和使用LoRA</h3>
+            <ol>
+                <li>下载LoRA模型(通常是.safetensors文件)</li>
+                <li>将文件放置在 <code>models/Lora/</code> 目录下</li>
+                <li>重启WebUI或点击"刷新"按钮</li>
+                <li>在提示词中使用以下语法启用LoRA：<code>&lt;lora:lora文件名:权重&gt;</code></li>
+            </ol>
+            <div class="note">
+                <p><strong>示例</strong>：&lt;lora:anime_style:0.7&gt; 一个动漫风格的女孩肖像</p>
+            </div>
+            
+            <h3>4.3 安装扩展</h3>
+            <p>WebUI的扩展功能可以极大地增强其能力：</p>
+            <ol>
+                <li>点击顶部菜单的"扩展"选项卡</li>
+                <li>选择"从网址安装"</li>
+                <li>输入扩展的GitHub仓库地址</li>
+                <li>点击"安装"</li>
+                <li>安装完成后点击"应用并重启UI"</li>
+            </ol>
+            
+            <h3>4.4 推荐扩展</h3>
+            <table>
+                <tr>
+                    <th>扩展名称</th>
+                    <th>描述</th>
+                    <th>GitHub链接</th>
+                </tr>
+                <tr>
+                    <td>ControlNet</td>
+                    <td>通过控制图像控制生成过程</td>
+                    <td><a href="https://github.com/Mikubill/sd-webui-controlnet" target="_blank">Mikubill/sd-webui-controlnet</a></td>
+                </tr>
+                <tr>
+                    <td>Additional Networks</td>
+                    <td>管理和应用LoRA</td>
+                    <td><a href="https://github.com/kohya-ss/sd-webui-additional-networks" target="_blank">kohya-ss/sd-webui-additional-networks</a></td>
+                </tr>
+                <tr>
+                    <td>Image Browser</td>
+                    <td>浏览和管理生成的图像</td>
+                    <td><a href="https://github.com/AlUlkesh/stable-diffusion-webui-images-browser" target="_blank">AlUlkesh/stable-diffusion-webui-images-browser</a></td>
+                </tr>
+                <tr>
+                    <td>Civitai Helper</td>
+                    <td>直接与Civitai模型库集成</td>
+                    <td><a href="https://github.com/civitai/sd_civitai_extension" target="_blank">civitai/sd_civitai_extension</a></td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="advanced-techniques">
+            <h2>5. 高级技巧</h2>
+            
+            <h3>5.1 ControlNet 使用</h3>
+            <p>ControlNet 允许您通过参考图像控制生成过程：</p>
+            <ol>
+                <li>安装ControlNet扩展</li>
+                <li>下载ControlNet模型并放入 <code>models/ControlNet/</code> 目录</li>
+                <li>在ControlNet面板中：
+                    <ul>
+                        <li>选择控制方式（边缘检测、深度图、姿势等）</li>
+                        <li>上传参考图像</li>
+                        <li>调整控制强度</li>
+                    </ul>
+                </li>
+                <li>正常生成图像，生成结果将受到参考图像的控制</li>
+            </ol>
+            
+            <h3>5.2 批量处理</h3>
+            <p>批量生成可以创建多个变体：</p>
+            <ul>
+                <li><strong>批次数</strong>：生成多少组图像</li>
+                <li><strong>批次大小</strong>：每组包含多少张图像（需要更多VRAM）</li>
+                <li><strong>脚本</strong>：可以使用X/Y/Z脚本进行参数自动变化的批处理</li>
+            </ul>
+            
+            <h3>5.3 提示词模板</h3>
+            <p>您可以创建和使用提示词模板来保存常用的提示词组合：</p>
+            <ol>
+                <li>在设置中找到"Prompts"部分</li>
+                <li>配置提示词模板</li>
+                <li>使用 <code>${模板名称}</code> 在提示词中调用模板</li>
+            </ol>
+            
+            <div class="note">
+                <p><strong>示例</strong>：创建一个名为"quality"的模板，内容为"高质量, 细节丰富, 8k, 锐利, 最佳质量"，然后在提示中使用 <code>${quality}</code> 来应用这个模板。</p>
+            </div>
+            
+            <h3>5.4 NSFW 过滤</h3>
+            <p>默认情况下，Stable Diffusion包含一个安全过滤器，如果您需要关闭它（自行承担责任）：</p>
+            <pre><code># 在启动命令中添加
+--no-half-vae --no-nsfw-filter</code></pre>
+            <div class="warning">
+                <p><strong>警告</strong>：请遵循当地法律法规，不要生成或分享违法内容。</p>
+            </div>
+        </section>
+
+        <section id="performance-optimization">
+            <h2>6. 性能优化</h2>
+            
+            <h3>6.1 针对不同显卡的优化</h3>
+            <table>
+                <tr>
+                    <th>显存大小</th>
+                    <th>推荐设置</th>
+                </tr>
+                <tr>
+                    <td>4GB</td>
+                    <td>
+                        <ul>
+                            <li>使用 <code>--lowvram</code> 参数</li>
+                            <li>尺寸限制在512x512</li>
+                            <li>使用较小的模型</li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr>
+                    <td>6GB</td>
+                    <td>
+                        <ul>
+                            <li>使用 <code>--medvram</code> 参数</li>
+                            <li>尺寸控制在512x768</li>
+                            <li>减少批次大小</li>
+                        </ul>
+                    </td>
+                </tr>
+                <tr>
+                    <td>8GB+</td>
+                    <td>
+                        <ul>
+                            <li>可以使用正常设置</li>
+                            <li>可以使用 <code>--xformers</code> 进一步优化</li>
+                            <li>支持更大的图像尺寸</li>
+                        </ul>
+                    </td>
+                </tr>
+            </table>
+            
+            <h3>6.2 CPU生成</h3>
+            <p>如果您没有兼容的GPU，也可以使用CPU生成（但速度会非常慢）：</p>
+            <pre><code>python launch.py --use-cpu all --no-half</code></pre>
+            
+            <h3>6.3 自定义VAE</h3>
+            <p>使用自定义VAE可以提高图像质量（特别是颜色和对比度）：</p>
+            <ol>
+                <li>下载VAE模型（如vae-ft-mse-840000-ema-pruned.safetensors）</li>
+                <li>放入 <code>models/VAE/</code> 目录</li>
+                <li>在设置中选择该VAE，或在每次生成时从下拉菜单中选择</li>
+            </ol>
+            
+            <div class="note">
+                <p><strong>提示</strong>：对于某些特定模型，使用匹配的VAE可以大大提高生成质量和稳定性。</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2024 Stable Diffusion WebUI文档 | <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank">官方GitHub仓库</a></p>
+    </footer>
+</body>
+</html> 

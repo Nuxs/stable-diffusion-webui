@@ -1,5 +1,11 @@
-PyQt6>=6.6.0
-PyQt6-WebEngine>=6.6.0
+# 核心依赖
+PyQt6==6.6.1
+PyQt6-Qt6==6.6.1
 requests>=2.31.0
 
+# 构建工具
+pyinstaller>=6.0.0
 
+# 可选依赖
+# PyQt6-WebEngine==6.6.0  # WebEngine 支持（可选，如需内嵌浏览器）
+py7zr>=0.20.0  # 7z 解压支持（可选，优先使用系统 7z 命令）

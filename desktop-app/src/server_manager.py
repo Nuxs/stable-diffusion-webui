@@ -58,35 +58,60 @@ class ServerManager(QObject):
             python_exe = None
             use_venv = False
             
+            # 0. 如果是打包模式，优先使用环境管理器（分离式打包方案）
+            if getattr(sys, 'frozen', False):
+                try:
+                    from src.utils.environment_manager import EnvironmentManager
+                    exe_dir = Path(sys.executable).parent
+                    env_manager = EnvironmentManager(exe_dir)
+                    if env_manager.setup_environment():
+                        python_exe = str(env_manager.get_python_exe())
+                        use_venv = True
+                        logger.info(f"✓ 使用打包的Python环境: {python_exe}")
+                except Exception as e:
+                    logger.debug(f"环境管理器不可用: {e}")
+            
             # 1. 优先查找项目根目录下的 venv 环境（应该包含 Python 3.10）
             # 在打包模式下，项目根目录可能在上级目录
             possible_project_roots = [self.project_root]
             
-            # 如果是打包模式，尝试向上查找真正的项目根目录
+            # 如果是打包模式，优先查找打包的venv（在exe同级目录）
             if getattr(sys, 'frozen', False):
+                # 打包模式下，venv应该在exe所在目录
+                exe_dir = Path(sys.executable).parent
+                
+                # 优先检查exe同级目录的venv（打包后的venv位置）
+                exe_venv = exe_dir / "venv" / "Scripts" / "python.exe"
+                if exe_venv.exists():
+                    possible_project_roots.insert(0, exe_dir)
+                    logger.info(f"✓ 在打包模式下找到打包的venv: {exe_venv}")
+                
+                # 也检查_internal目录（如果venv被打包到_internal）
+                internal_venv = exe_dir / "_internal" / "venv" / "Scripts" / "python.exe"
+                if internal_venv.exists():
+                    possible_project_roots.insert(0, exe_dir / "_internal")
+                    logger.info(f"✓ 在打包模式下找到_internal中的venv: {internal_venv}")
+                
+                # 然后检查项目根目录（向上查找）
                 current = Path(self.project_root)
-                # 如果当前是 _internal 目录，向上查找真正的项目根目录
                 if current.name == "_internal":
-                    # 从 _internal 向上查找，直到找到包含 venv 或 launch.py/webui.py 的目录
-                    # 路径结构可能是: dist/StableDiffusionWebUI/_internal -> dist/StableDiffusionWebUI -> ... -> stable-diffusion-webui
-                    for _ in range(5):  # 向上查找最多 5 级
+                    # 从 _internal 向上查找
+                    for _ in range(5):
                         current = current.parent
-                        # 检查是否包含 venv（优先）
-                        if (current / "venv" / "Scripts" / "python.exe").exists():
-                            possible_project_roots.insert(0, current)  # 优先使用包含 venv 的目录
-                            logger.info(f"在打包模式下找到包含 venv 的项目根目录: {current}")
+                        venv_check = current / "venv" / "Scripts" / "python.exe"
+                        if venv_check.exists():
+                            possible_project_roots.append(current)
+                            logger.info(f"在打包模式下找到上级目录的venv: {venv_check}")
                             break
-                        # 检查是否包含 launch.py 或 webui.py（且不在 _internal 中）
-                        elif (current / "launch.py").exists() or (current / "webui.py").exists():
-                            if current.name != "_internal":  # 确保不是另一个 _internal 目录
-                                possible_project_roots.append(current)
-                                logger.info(f"在打包模式下找到包含 launch.py/webui.py 的目录: {current}")
+                        elif ((current / "launch.py").exists() or (current / "webui.py").exists()) and current.name != "_internal":
+                            possible_project_roots.append(current)
                 else:
                     # 如果 project_root 不是 _internal，也尝试向上查找
                     for _ in range(3):
                         current = current.parent
-                        if (current / "venv" / "Scripts" / "python.exe").exists():
-                            possible_project_roots.insert(0, current)
+                        venv_check = current / "venv" / "Scripts" / "python.exe"
+                        if venv_check.exists():
+                            possible_project_roots.append(current)
                             break
                         elif ((current / "launch.py").exists() or (current / "webui.py").exists()) and current.name != "_internal":
                             possible_project_roots.append(current)

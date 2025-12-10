@@ -1,0 +1,146 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2024-12-10",
+  
+  "python_environments": {
+    "cpu": {
+      "name": "Python 3.10 (CPU)",
+      "version": "1.0.0",
+      "description": "CPU版本，适合无独立显卡的电脑",
+      "size_bytes": 2147483648,
+      "size_display": "2.0 GB",
+      "url": "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip",
+      "md5": "608619f8619075629c9c69f361352a85",
+      "mirrors": [
+        "https://npm.taobao.org/mirrors/python/3.10.11/python-3.10.11-embed-amd64.zip"
+      ],
+      "requirements": {
+        "disk_space_bytes": 5368709120,
+        "disk_space_display": "5 GB"
+      },
+      "recommended_for": ["cpu_only", "low_vram"]
+    },
+    
+    "cuda118": {
+      "name": "Python 3.10 + CUDA 11.8",
+      "version": "1.0.0",
+      "description": "适合NVIDIA显卡（GTX 10系列及以上）",
+      "size_bytes": 4294967296,
+      "size_display": "4.0 GB",
+      "url": "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip",
+      "md5": "608619f8619075629c9c69f361352a85",
+      "mirrors": [],
+      "pytorch_install": {
+        "index_url": "https://download.pytorch.org/whl/cu118",
+        "packages": ["torch==2.1.2", "torchvision", "xformers"]
+      },
+      "requirements": {
+        "disk_space_bytes": 10737418240,
+        "disk_space_display": "10 GB",
+        "cuda_version": "11.x",
+        "vram_bytes": 4294967296,
+        "vram_display": "4 GB"
+      },
+      "recommended_for": ["nvidia_gtx_10xx", "nvidia_rtx_20xx", "nvidia_rtx_30xx"]
+    },
+    
+    "cuda121": {
+      "name": "Python 3.10 + CUDA 12.1",
+      "version": "1.0.0",
+      "description": "适合新款NVIDIA显卡（RTX 40系列）",
+      "size_bytes": 4294967296,
+      "size_display": "4.0 GB",
+      "url": "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip",
+      "md5": "608619f8619075629c9c69f361352a85",
+      "mirrors": [],
+      "pytorch_install": {
+        "index_url": "https://download.pytorch.org/whl/cu121",
+        "packages": ["torch==2.1.2", "torchvision", "xformers"]
+      },
+      "requirements": {
+        "disk_space_bytes": 10737418240,
+        "disk_space_display": "10 GB",
+        "cuda_version": "12.x",
+        "vram_bytes": 4294967296,
+        "vram_display": "4 GB"
+      },
+      "recommended_for": ["nvidia_rtx_40xx"]
+    }
+  },
+  
+  "webui_core": {
+    "version": "1.7.0",
+    "size_bytes": 52428800,
+    "size_display": "50 MB",
+    "description": "Stable Diffusion WebUI 核心文件",
+    "url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui/archive/refs/heads/master.zip",
+    "md5": "",
+    "mirrors": [],
+    "changelog": [
+      "新增 ControlNet 支持",
+      "优化启动速度",
+      "修复已知 Bug"
+    ]
+  },
+  
+  "models": {
+    "sd-v1-5": {
+      "id": "sd-v1-5",
+      "name": "Stable Diffusion 1.5",
+      "version": "1.5",
+      "description": "最经典的版本，速度快，适合入门",
+      "size_bytes": 4265146195,
+      "size_display": "4.27 GB",
+      "url": "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors",
+      "filename": "v1-5-pruned-emaonly.safetensors",
+      "md5": "cc6cb27103417325ff94f52b7a5d2dde",
+      "mirrors": [
+        "https://hf-mirror.com/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"
+      ],
+      "recommended": true,
+      "category": "base",
+      "requirements": {
+        "vram_bytes": 4294967296,
+        "vram_display": "4 GB"
+      },
+      "tags": ["v1.5", "base", "general"]
+    },
+    
+    "sdxl-base": {
+      "id": "sdxl-base",
+      "name": "Stable Diffusion XL Base",
+      "version": "1.0",
+      "description": "更高质量，但速度较慢，需要更强显卡",
+      "size_bytes": 6938078935,
+      "size_display": "6.94 GB",
+      "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors",
+      "filename": "sd_xl_base_1.0.safetensors",
+      "md5": "",
+      "mirrors": [
+        "https://hf-mirror.com/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
+      ],
+      "recommended": false,
+      "category": "base",
+      "requirements": {
+        "vram_bytes": 10737418240,
+        "vram_display": "10 GB"
+      },
+      "tags": ["xl", "base", "high-quality"]
+    }
+  },
+  
+  "dependencies": {
+    "vcredist": {
+      "name": "Visual C++ Redistributable 2015-2022",
+      "version": "14.x",
+      "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+      "required": true,
+      "check_method": "registry",
+      "registry_keys": [
+        "SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64",
+        "SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64"
+      ]
+    }
+  }
+}
+

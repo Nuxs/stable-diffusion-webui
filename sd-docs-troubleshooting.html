@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion WebUI - 问题排查</title>
+    <link rel="stylesheet" href="sd-docs-style.css">
+</head>
+<body>
+    <header>
+        <h1>Stable Diffusion WebUI 开发文档</h1>
+        <p>版本: 1.0 | 更新日期: 2024年11月</p>
+        <nav>
+            <ul>
+                <li><a href="sd-docs-overview.html">项目概述</a></li>
+                <li><a href="sd-docs-installation.html">安装指南</a></li>
+                <li><a href="sd-docs-usage.html">使用指南</a></li>
+                <li><a href="sd-docs-development.html">开发指南</a></li>
+                <li><a href="sd-docs-api.html">API参考</a></li>
+                <li><a href="sd-docs-troubleshooting.html" class="active">问题排查</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="installation-issues">
+            <h2>1. 安装问题</h2>
+            
+            <h3>1.1 Python 版本问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "INCOMPATIBLE PYTHON VERSION" 错误或者 "RuntimeError: Couldn't install torch" 等与Python版本相关的错误。</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>删除现有的venv目录</li>
+                <li>使用Conda创建Python 3.10环境：
+                <pre><code>conda create -n sd-webui python=3.10 -y
+conda activate sd-webui</code></pre>
+                </li>
+                <li>使用匹配的Python版本重新启动WebUI</li>
+            </ol>
+            
+            <div class="note">
+                <p>Stable Diffusion WebUI对Python版本要求严格，强烈推荐使用Python 3.10.6。</p>
+            </div>
+            
+            <h3>1.2 CUDA/PyTorch 兼容性问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "Could not find a version that satisfies the requirement torch==X.X.X" 或 GPU加速不可用。</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <p>根据您的CUDA版本安装匹配的PyTorch：</p>
+            <table>
+                <tr>
+                    <th>CUDA版本</th>
+                    <th>推荐PyTorch命令</th>
+                </tr>
+                <tr>
+                    <td>CUDA 12.x</td>
+                    <td><code>pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 --extra-index-url https://download.pytorch.org/whl/cu121</code></td>
+                </tr>
+                <tr>
+                    <td>CUDA 11.8</td>
+                    <td><code>pip install torch==2.0.1 torchvision==0.15.2 --index-url https://download.pytorch.org/whl/cu118</code></td>
+                </tr>
+                <tr>
+                    <td>无GPU/CPU模式</td>
+                    <td><code>pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu</code></td>
+                </tr>
+            </table>
+            
+            <h3>1.3 权限问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "Permission denied" 或 "Access is denied" 错误。</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ul>
+                <li><strong>Windows</strong>：以管理员身份运行命令提示符或PowerShell</li>
+                <li><strong>Linux/Mac</strong>：使用sudo或修改文件权限
+                <pre><code>chmod -R 755 ./stable-diffusion-webui</code></pre>
+                </li>
+            </ul>
+            
+            <h3>1.4 PowerShell执行策略限制</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "无法加载文件...因为在此系统上禁止运行脚本"</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <p>临时修改PowerShell执行策略：</p>
+            <pre><code>Set-ExecutionPolicy Bypass -Scope Process -Force</code></pre>
+            <p>或直接使用命令绕过执行策略：</p>
+            <pre><code>powershell -ExecutionPolicy Bypass -File .\setup_stable_diffusion.ps1</code></pre>
+        </section>
+
+        <section id="runtime-issues">
+            <h2>2. 运行时问题</h2>
+            
+            <h3>2.1 显存不足</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "CUDA out of memory"、"RuntimeError: CUDA error: out of memory" 或程序崩溃。</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>使用优化参数启动WebUI：
+                <pre><code># 低显存模式（4GB显存）
+python launch.py --lowvram --precision full --no-half
+
+# 中等显存模式（6-8GB显存）
+python launch.py --medvram --xformers</code></pre>
+                </li>
+                <li>减小生成图像的尺寸（如512x512而不是1024x1024）</li>
+                <li>减少批次大小</li>
+                <li>使用更小的模型</li>
+            </ol>
+            
+            <h3>2.2 模型加载失败</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "Error loading model" 或 "RuntimeError: unexpected EOF, expected more bytes"</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>检查模型文件是否完整，可能需要重新下载</li>
+                <li>尝试使用safetensors格式的模型而不是ckpt</li>
+                <li>使用--no-half-vae参数启动：
+                <pre><code>python launch.py --no-half-vae</code></pre>
+                </li>
+                <li>确保有足够的RAM和虚拟内存</li>
+            </ol>
+            
+            <h3>2.3 黑图或色彩失真</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: 生成全黑或颜色严重失真的图像</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>尝试使用专用VAE（如vae-ft-mse-840000-ema-pruned）</li>
+                <li>减小CFG值（尝试7-9的值）</li>
+                <li>使用不同的采样器（如Euler a或DPM++ 2M Karras）</li>
+                <li>如果使用LoRA，降低其权重</li>
+            </ol>
+            
+            <h3>2.4 网络连接问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: "无法访问WebUI" 或 "ERR_CONNECTION_REFUSED"</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>检查地址是否正确（默认为 <a href="http://localhost:7860">http://localhost:7860</a>）</li>
+                <li>检查防火墙设置，允许相应端口的访问</li>
+                <li>使用--listen参数使WebUI在所有网络接口上可访问：
+                <pre><code>python launch.py --listen</code></pre>
+                </li>
+                <li>如需远程访问，使用：
+                <pre><code>python launch.py --listen --share</code></pre>
+                </li>
+            </ol>
+        </section>
+
+        <section id="generation-issues">
+            <h2>3. 生成问题</h2>
+            
+            <h3>3.1 生成结果与提示词不符</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: 生成的图像与提示词描述不匹配或相差很大</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>增加CFG值（如12-14）以提高提示词遵循度</li>
+                <li>增加采样步数（如30-50步）</li>
+                <li>优化提示词，使用更具体、更详细的描述</li>
+                <li>检查是否有不良的负面提示词抑制了重要内容</li>
+                <li>尝试不同的模型，某些模型可能更适合特定类型的内容</li>
+            </ol>
+            
+            <h3>3.2 面部畸变或手指问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: 生成的人物面部扭曲或手指数量不正确</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>使用更专业的模型（如面部优化的模型）</li>
+                <li>在负面提示词中添加：<code>畸形, 变形, 扭曲的面部, 扭曲的五官, 额外的手指, 畸形的手</code></li>
+                <li>使用面部修复选项（Face Restoration）</li>
+                <li>使用ControlNet姿势控制（如OpenPose或DWPose）</li>
+                <li>使用较低的去噪强度进行img2img优化</li>
+            </ol>
+            
+            <h3>3.3 图像生成速度慢</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: 图像生成耗时过长</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>启用xformers优化：
+                <pre><code>python launch.py --xformers</code></pre>
+                </li>
+                <li>使用较小的图像尺寸</li>
+                <li>减少采样步数（如15-20步）</li>
+                <li>使用更高效的采样器（如DPM++ 2M Karras或DDIM）</li>
+                <li>使用半精度计算：
+                <pre><code>python launch.py --precision half</code></pre>
+                </li>
+            </ol>
+            
+            <h3>3.4 模型切换问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: 切换模型时崩溃或显存不足</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>使用模型卸载选项：
+                <pre><code>python launch.py --unload-models-when-training</code></pre>
+                </li>
+                <li>在WebUI设置中启用"Move VAE和CLIP to CPU when switching models"</li>
+                <li>重新启动WebUI，而不是切换多个大型模型</li>
+                <li>使用--lowvram或--medvram参数启动</li>
+            </ol>
+        </section>
+
+        <section id="extension-issues">
+            <h2>4. 扩展问题</h2>
+            
+            <h3>4.1 扩展安装失败</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: 扩展安装失败或无法加载</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>检查扩展的GitHub网址是否正确</li>
+                <li>启用不安全的扩展访问：
+                <pre><code>python launch.py --enable-insecure-extension-access</code></pre>
+                </li>
+                <li>尝试手动安装扩展：
+                <pre><code>cd extensions
+git clone https://github.com/扩展作者/扩展名称</code></pre>
+                </li>
+                <li>检查是否有版本兼容性问题（查看扩展的GitHub页面）</li>
+            </ol>
+            
+            <h3>4.2 ControlNet问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: ControlNet无法加载或效果不佳</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>确保已下载并放置正确的ControlNet模型文件</li>
+                <li>检查控制图像的质量和清晰度</li>
+                <li>调整控制权重（通常0.5-0.8是良好起点）</li>
+                <li>尝试不同的预处理器设置</li>
+                <li>如果内存不足，使用ControlNet的低内存选项</li>
+            </ol>
+            
+            <h3>4.3 LoRA加载问题</h3>
+            <div class="warning">
+                <p><strong>症状</strong>: LoRA模型无法加载或没有效果</p>
+            </div>
+            
+            <h4>解决方案：</h4>
+            <ol>
+                <li>确保LoRA文件放在正确的目录（models/Lora/）</li>
+                <li>检查LoRA触发词（在模型下载页面通常会提供）</li>
+                <li>调整LoRA权重（试试0.7-0.9）</li>
+                <li>确保LoRA模型与当前使用的基础模型兼容</li>
+                <li>如果使用多个LoRA，注意它们之间可能的冲突</li>
+            </ol>
+        </section>
+
+        <section id="system-maintenance">
+            <h2>5. 系统维护</h2>
+            
+            <h3>5.1 清理缓存和临时文件</h3>
+            <p>如果WebUI变得缓慢或占用过多空间，可以清理以下目录：</p>
+            <ul>
+                <li><code>temp/</code> - 临时生成的图像</li>
+                <li><code>log/</code> - 日志文件</li>
+                <li><code>embeddings_cache/</code> - 嵌入缓存</li>
+            </ul>
+            
+            <p>可以使用以下命令启动时清理缓存：</p>
+            <pre><code>python launch.py --clean-temp-dir</code></pre>
+            
+            <h3>5.2 更新WebUI</h3>
+            <p>定期更新WebUI以获取最新功能和修复：</p>
+            <pre><code>git pull</code></pre>
+            
+            <p>如果你修改了本地文件，可能需要先重置：</p>
+            <pre><code>git reset --hard
+git pull</code></pre>
+            
+            <div class="warning">
+                <p><strong>注意</strong>：在重置前备份任何自定义修改的文件。</p>
+            </div>
+            
+            <h3>5.3 备份重要数据</h3>
+            <p>定期备份以下目录：</p>
+            <ul>
+                <li><code>models/</code> - 所有模型文件</li>
+                <li><code>embeddings/</code> - 训练的嵌入</li>
+                <li><code>extensions/</code> - 安装的扩展</li>
+                <li><code>outputs/</code> - 生成的图像</li>
+                <li><code>config.json</code> 和 <code>ui-config.json</code> - 配置文件</li>
+            </ul>
+        </section>
+
+        <section id="common-error-messages">
+            <h2>6. 常见错误信息解析</h2>
+            
+            <table>
+                <tr>
+                    <th>错误信息</th>
+                    <th>可能原因</th>
+                    <th>解决方案</th>
+                </tr>
+                <tr>
+                    <td>"CUDA error: out of memory"</td>
+                    <td>GPU显存不足</td>
+                    <td>使用--lowvram或--medvram参数，减小图像尺寸或批次大小</td>
+                </tr>
+                <tr>
+                    <td>"RuntimeError: Couldn't install torch"</td>
+                    <td>Python版本与PyTorch不兼容</td>
+                    <td>使用Python 3.10，安装匹配的PyTorch版本</td>
+                </tr>
+                <tr>
+                    <td>"OSError: [Errno 28] No space left on device"</td>
+                    <td>磁盘空间不足</td>
+                    <td>清理磁盘空间，删除不需要的临时文件或模型</td>
+                </tr>
+                <tr>
+                    <td>"AssertionError: Torch not compiled with CUDA enabled"</td>
+                    <td>PyTorch未启用CUDA</td>
+                    <td>重新安装带CUDA支持的PyTorch</td>
+                </tr>
+                <tr>
+                    <td>"ModuleNotFoundError: No module named..."</td>
+                    <td>缺少Python依赖</td>
+                    <td>运行<code>pip install -r requirements.txt</code></td>
+                </tr>
+                <tr>
+                    <td>"TypeError: unsupported operand type(s) for +=: 'float' and 'NoneType'"</td>
+                    <td>LoRA或模型损坏</td>
+                    <td>使用不同的LoRA或更新/重装模型</td>
+                </tr>
+            </table>
+            
+            <div class="tip">
+                <p><strong>提示</strong>：查看logs文件夹中的日志文件可获取更详细的错误信息。</p>
+            </div>
+        </section>
+
+        <section id="community-support">
+            <h2>7. 社区支持资源</h2>
+            
+            <h3>7.1 官方资源</h3>
+            <ul>
+                <li><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues" target="_blank">GitHub Issues</a> - 报告问题或查找已知问题的解决方案</li>
+                <li><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki" target="_blank">官方Wiki</a> - 详细文档和指南</li>
+                <li><a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui/discussions" target="_blank">GitHub Discussions</a> - 社区讨论</li>
+            </ul>
+            
+            <h3>7.2 社区资源</h3>
+            <ul>
+                <li><a href="https://www.reddit.com/r/StableDiffusion/" target="_blank">Reddit r/StableDiffusion</a> - Reddit上活跃的社区</li>
+                <li><a href="https://discord.gg/stablediffusion" target="_blank">Stable Diffusion Discord</a> - Discord社区和实时支持</li>
+                <li><a href="https://huggingface.co/spaces/stabilityai/stable-diffusion" target="_blank">Hugging Face Community</a> - Hugging Face上的Stable Diffusion社区</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2024 Stable Diffusion WebUI文档 | <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank">官方GitHub仓库</a></p>
+    </footer>
+</body>
+</html> 

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion WebUI - 开发指南</title>
+    <link rel="stylesheet" href="sd-docs-style.css">
+</head>
+<body>
+    <header>
+        <h1>Stable Diffusion WebUI 开发文档</h1>
+        <p>版本: 1.0 | 更新日期: 2024年11月</p>
+        <nav>
+            <ul>
+                <li><a href="sd-docs-overview.html">项目概述</a></li>
+                <li><a href="sd-docs-installation.html">安装指南</a></li>
+                <li><a href="sd-docs-usage.html">使用指南</a></li>
+                <li><a href="sd-docs-development.html" class="active">开发指南</a></li>
+                <li><a href="sd-docs-api.html">API参考</a></li>
+                <li><a href="sd-docs-troubleshooting.html">问题排查</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="project-structure">
+            <h2>1. 项目结构</h2>
+            
+            <h3>1.1 主要目录</h3>
+            <pre><code>stable-diffusion-webui/
+├── extensions/         # 插件目录
+├── javascript/         # 前端JavaScript代码
+├── localizations/      # 多语言支持文件
+├── models/             # 模型文件
+├── modules/            # 核心Python模块
+│   ├── call_queue.py   # 任务队列管理
+│   ├── devices.py      # 设备管理
+│   ├── paths.py        # 路径管理
+│   ├── processing.py   # 图像处理
+│   ├── sd_models.py    # 模型管理
+│   ├── shared.py       # 共享变量
+│   └── ui.py           # 用户界面组件
+├── repositories/       # 依赖的其他仓库
+├── scripts/            # 辅助脚本
+├── ui-config.json      # UI配置
+├── config.json         # 主配置文件
+├── webui.py            # 主入口文件
+└── launch.py           # 启动脚本</code></pre>
+            
+            <h3>1.2 关键文件说明</h3>
+            <table>
+                <tr>
+                    <th>文件名</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td>webui.py</td>
+                    <td>项目的主要入口点，负责初始化Gradio界面和启动服务器</td>
+                </tr>
+                <tr>
+                    <td>launch.py</td>
+                    <td>启动脚本，负责环境准备和依赖安装</td>
+                </tr>
+                <tr>
+                    <td>modules/shared.py</td>
+                    <td>包含全局共享变量和配置</td>
+                </tr>
+                <tr>
+                    <td>modules/processing.py</td>
+                    <td>实现图像生成和处理的核心逻辑</td>
+                </tr>
+                <tr>
+                    <td>modules/sd_models.py</td>
+                    <td>处理模型加载和管理</td>
+                </tr>
+                <tr>
+                    <td>modules/ui.py</td>
+                    <td>构建Gradio UI界面的组件</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="extension-development">
+            <h2>2. 插件开发</h2>
+            
+            <h3>2.1 插件结构</h3>
+            <p>插件需要遵循特定的目录结构：</p>
+            <pre><code>extensions/your_extension_name/
+├── scripts/              # Python脚本
+│   ├── __init__.py       # Python包初始化
+│   └── main.py           # 主脚本文件
+├── style.css             # 样式表（可选）
+├── javascript.js         # JavaScript代码（可选）
+├── preload.py            # 预加载脚本（可选）
+├── install.py            # 安装脚本（可选）
+└── readme.md             # 文档</code></pre>
+            
+            <h3>2.2 创建基本插件</h3>
+            <p>以下是一个简单插件的示例：</p>
+            <pre><code># extensions/example_extension/scripts/main.py
+import modules.scripts as scripts
+import gradio as gr
+
+class ExampleScript(scripts.Script):
+    def title(self):
+        return "示例插件"
+
+    def show(self, is_img2img):
+        return scripts.AlwaysVisible
+
+    def ui(self, is_img2img):
+        with gr.Group():
+            with gr.Accordion("示例插件", open=False):
+                enable = gr.Checkbox(label="启用示例功能", value=False)
+                strength = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label="效果强度", value=0.5)
+        
+        return [enable, strength]
+
+    def process(self, p, enable, strength):
+        if not enable:
+            return p
+        
+        # 在这里实现您的处理逻辑
+        print(f"示例插件已激活，强度: {strength}")
+        
+        return p</code></pre>
+            
+            <h3>2.3 插件生命周期钩子</h3>
+            <table>
+                <tr>
+                    <th>钩子方法</th>
+                    <th>描述</th>
+                </tr>
+                <tr>
+                    <td>title()</td>
+                    <td>返回插件标题</td>
+                </tr>
+                <tr>
+                    <td>show(is_img2img)</td>
+                    <td>控制插件显示的条件</td>
+                </tr>
+                <tr>
+                    <td>ui(is_img2img)</td>
+                    <td>创建UI元素</td>
+                </tr>
+                <tr>
+                    <td>before_process(p)</td>
+                    <td>处理前的钩子</td>
+                </tr>
+                <tr>
+                    <td>process(p, *args)</td>
+                    <td>主处理方法</td>
+                </tr>
+                <tr>
+                    <td>postprocess(p, processed, *args)</td>
+                    <td>处理后的钩子</td>
+                </tr>
+            </table>
+            
+            <h3>2.4 安装依赖</h3>
+            <p>使用install.py可以安装插件所需的依赖：</p>
+            <pre><code># extensions/example_extension/install.py
+import os
+import sys
+import subprocess
+
+# 获取当前目录
+extension_dir = os.path.dirname(os.path.realpath(__file__))
+
+# 安装requirements.txt中的依赖
+requirements_file = os.path.join(extension_dir, "requirements.txt")
+if os.path.exists(requirements_file):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_file])
+
+print("插件依赖安装完成！")</code></pre>
+            
+            <div class="note">
+                <p><strong>注意</strong>：插件应尽量少包含自定义依赖，以避免与WebUI核心依赖发生冲突。</p>
+            </div>
+        </section>
+
+        <section id="api-usage">
+            <h2>3. API使用</h2>
+            
+            <h3>3.1 启用API</h3>
+            <p>要使用API，需要在启动时添加<code>--api</code>参数：</p>
+            <pre><code>python launch.py --api</code></pre>
+            <p>或者在webui-user.bat/sh中设置：</p>
+            <pre><code>set COMMANDLINE_ARGS=--api</code></pre>
+            
+            <h3>3.2 基本API调用</h3>
+            <p>Stable Diffusion WebUI的API是基于REST的，主要端点包括：</p>
+            <ul>
+                <li><code>/sdapi/v1/txt2img</code> - 文本到图像</li>
+                <li><code>/sdapi/v1/img2img</code> - 图像到图像</li>
+                <li><code>/sdapi/v1/extra-single-image</code> - 单图增强</li>
+                <li><code>/sdapi/v1/png-info</code> - 获取PNG信息</li>
+                <li><code>/sdapi/v1/progress</code> - 获取进度</li>
+                <li><code>/sdapi/v1/options</code> - 获取/设置选项</li>
+                <li><code>/sdapi/v1/sd-models</code> - 获取模型列表</li>
+            </ul>
+            
+            <h3>3.3 Python API示例</h3>
+            <pre><code>import json
+import requests
+import io
+import base64
+from PIL import Image
+
+# 服务器URL
+url = "http://127.0.0.1:7860"
+
+# 文本到图像
+def text_to_image(prompt, negative_prompt="", steps=20, width=512, height=512):
+    payload = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "steps": steps,
+        "width": width,
+        "height": height,
+        "sampler_name": "Euler a",
+        "cfg_scale": 7,
+        "seed": -1
+    }
+    
+    response = requests.post(url=f"{url}/sdapi/v1/txt2img", json=payload)
+    r = response.json()
+    
+    for i, img_data in enumerate(r['images']):
+        image = Image.open(io.BytesIO(base64.b64decode(img_data.split(",", 1)[0])))
+        image.save(f"output_{i}.png")
+        
+    return r
+
+# 切换模型
+def change_model(model_name):
+    option_payload = {
+        "sd_model_checkpoint": model_name
+    }
+    response = requests.post(url=f"{url}/sdapi/v1/options", json=option_payload)
+    return response.json()
+
+# 获取模型列表
+def get_models():
+    response = requests.get(url=f"{url}/sdapi/v1/sd-models")
+    return response.json()
+
+# 使用示例
+if __name__ == "__main__":
+    # 获取可用模型
+    models = get_models()
+    print("可用模型：")
+    for model in models:
+        print(f"- {model['title']}")
+    
+    # 切换模型
+    change_model("v1-5-pruned-emaonly.safetensors")
+    
+    # 生成图像
+    result = text_to_image(
+        prompt="一只可爱的猫咪，高质量，逼真",
+        negative_prompt="模糊，低质量，变形",
+        steps=20
+    )
+    print("图像生成完成！")</code></pre>
+            
+            <h3>3.4 JavaScript API示例</h3>
+            <pre><code>// 假设使用浏览器环境或Node.js + fetch
+async function generateImage(prompt) {
+    const response = await fetch('http://127.0.0.1:7860/sdapi/v1/txt2img', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            steps: 20,
+            width: 512,
+            height: 512
+        })
+    });
+    
+    const data = await response.json();
+    
+    // 处理返回的图像数据
+    // 在浏览器环境中可以这样显示图像
+    const image = document.createElement('img');
+    image.src = `data:image/png;base64,${data.images[0]}`;
+    document.body.appendChild(image);
+    
+    return data;
+}
+
+// 调用示例
+generateImage("a beautiful landscape, high quality, 4k")
+    .then(result => console.log("生成成功"))
+    .catch(error => console.error("生成失败:", error));</code></pre>
+        </section>
+
+        <section id="advanced-development">
+            <h2>4. 高级开发</h2>
+            
+            <h3>4.1 自定义模型集成</h3>
+            <p>如果您开发了自定义的Stable Diffusion模型或组件，可以通过以下方式集成到WebUI中：</p>
+            <ol>
+                <li>将模型放入相应目录（如models/Stable-diffusion/）</li>
+                <li>通过扩展插件hook到生成流程中</li>
+                <li>使用自定义采样器或网络模块</li>
+            </ol>
+            
+            <h3>4.2 修改界面</h3>
+            <p>通过创建自定义CSS文件，您可以修改WebUI的样式：</p>
+            <pre><code>/* 放置在extensions/your_extension/style.css */
+/* 或者在user.css中全局应用 */
+
+/* 自定义主题颜色 */
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2ecc71;
+    --background-color: #f8f9fa;
+}
+
+/* 自定义组件样式 */
+.gradio-container {
+    background-color: var(--background-color);
+}
+
+/* 按钮样式 */
+.gradio-button {
+    background-color: var(--primary-color);
+    border-radius: 8px;
+}
+
+/* 标签样式 */
+.gradio-accordion .label {
+    font-weight: bold;
+}</code></pre>
+            
+            <h3>4.3 定制启动参数</h3>
+            <p>通过修改webui-user.bat（Windows）或webui-user.sh（Linux/Mac）可以定制启动参数：</p>
+            <pre><code>@echo off
+set PYTHON=
+set GIT=
+set VENV_DIR=
+set COMMANDLINE_ARGS=--xformers --medvram --theme dark --api --enable-insecure-extension-access --gradio-auth username:password
+
+call webui.bat</code></pre>
+            
+            <h3>4.4 性能优化技巧</h3>
+            <div class="note">
+                <ul>
+                    <li><strong>使用xformers</strong>: 添加<code>--xformers</code>参数大幅降低VRAM占用</li>
+                    <li><strong>使用半精度</strong>: 添加<code>--precision half</code>参数，对于大多数现代GPU能提高速度</li>
+                    <li><strong>VRAM优化</strong>: 使用<code>--medvram</code>或<code>--lowvram</code>优化VRAM使用</li>
+                    <li><strong>优化模型加载</strong>: 使用<code>--no-half-vae</code>提高VAE稳定性，对于一些特殊模型有帮助</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="contribution-guidelines">
+            <h2>5. 贡献指南</h2>
+            
+            <h3>5.1 提交PR</h3>
+            <ol>
+                <li>Fork官方仓库</li>
+                <li>创建功能分支</li>
+                <li>提交修改</li>
+                <li>确保所有测试通过</li>
+                <li>创建Pull Request</li>
+            </ol>
+            
+            <h3>5.2 编码规范</h3>
+            <ul>
+                <li>遵循PEP 8 Python样式指南</li>
+                <li>使用有意义的变量和函数名</li>
+                <li>为函数和类添加文档字符串</li>
+                <li>保持向后兼容性</li>
+                <li>避免不必要的依赖</li>
+            </ul>
+            
+            <h3>5.3 测试</h3>
+            <p>在提交代码前，请确保：</p>
+            <ul>
+                <li>你的代码在不同平台（Windows、Linux、MacOS）上都能正常工作</li>
+                <li>不会破坏现有功能</li>
+                <li>UI元素遵循现有的设计模式</li>
+                <li>错误处理妥当</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2024 Stable Diffusion WebUI文档 | <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank">官方GitHub仓库</a></p>
+    </footer>
+</body>
+</html> 
