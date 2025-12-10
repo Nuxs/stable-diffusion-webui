@@ -8,7 +8,7 @@ Portable Python 管理器
 import subprocess
 import logging
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class PortablePythonManager:
         self.data_dir = Path(data_dir)
         self.python_env_dir = self.data_dir / "python-env"
         self.dm = download_manager
+        self.current_env_type: Optional[str] = None
     
     def is_environment_ready(self) -> bool:
         """检查 Python 环境是否已准备好"""
@@ -91,6 +92,7 @@ class PortablePythonManager:
             if not self._install_dependencies(env_type):
                 return False
             
+            self.current_env_type = env_type
             logger.info("Python 环境设置完成")
             return True
             
@@ -283,6 +285,15 @@ class PortablePythonManager:
         if self.is_environment_ready():
             return self.python_env_dir / "python.exe"
         return None
+    
+    def get_environment_state(self) -> Dict[str, Optional[str]]:
+        """返回供运行时写入的环境状态"""
+        python_exe = self.get_python_exe()
+        return {
+            "type": self.current_env_type,
+            "path": str(self.python_env_dir),
+            "python_exe": str(python_exe) if python_exe else None,
+        }
     
     def run_command(self, command: list, **kwargs) -> subprocess.CompletedProcess:
         """

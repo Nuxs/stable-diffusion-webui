@@ -31,9 +31,10 @@ class MainWindow(QMainWindow):
     server_ready = pyqtSignal(str)  # 服务器就绪信号
     server_error = pyqtSignal(str)  # 服务器错误信号
     
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, data_dir: Path):
         super().__init__()
         self.project_root = project_root
+        self.data_dir = Path(data_dir)
         self.config = Config()
         self.server_manager: Optional[ServerManager] = None
         self.web_view: Optional[QWebEngineView] = None
@@ -194,7 +195,7 @@ class MainWindow(QMainWindow):
         
     def init_server(self):
         """初始化服务器"""
-        self.server_manager = ServerManager(self.project_root, self.config)
+        self.server_manager = ServerManager(self.project_root, self.config, self.data_dir)
         
         # 连接信号
         self.server_manager.server_ready.connect(self.on_server_ready)

@@ -163,121 +163,22 @@ def build():
         exe_path_single = dist_dir / "StableDiffusionWebUI.exe"
         
         if exe_path_dir.exists():
-            # 目录模式 - 正确
             print(f"✓ 目录模式构建成功！")
             print(f"可执行文件位于: {exe_path_dir}")
             print()
-            
-            # 检查是否需要创建环境包（分离式打包方案）
-            project_root = Path(__file__).parent.parent
-            venv_path = project_root / 'venv'
-            env_package_script = Path(__file__).parent / "create_environment_package.py"
-            
-            if venv_path.exists() and env_package_script.exists():
-                print("=" * 60)
-                print("检测到venv环境，开始创建完整分发包...")
-                print("=" * 60)
-                print()
-                
-                # 创建环境包
-                try:
-                    import subprocess
-                    result = subprocess.run(
-                        [sys.executable, str(env_package_script)],
-                        check=True,
-                        cwd=str(Path(__file__).parent)
-                    )
-                    
-                    # 复制环境包到dist目录
-                    env_package = Path(__file__).parent / "environment" / "venv.7z"
-                    # 也检查zip格式
-                    if not env_package.exists():
-                        env_package = Path(__file__).parent / "environment" / "venv.zip"
-                    
-                    if env_package.exists():
-                        dist_env_dir = dist_dir / "StableDiffusionWebUI" / "environment"
-                        dist_env_dir.mkdir(exist_ok=True)
-                        shutil.copy2(env_package, dist_env_dir / env_package.name)
-                    
-                    # 创建README
-                    readme_content = """# Stable Diffusion WebUI 桌面版
-
-## 首次运行
-
-1. 双击 `StableDiffusionWebUI.exe` 启动应用
-2. 首次运行会自动解压Python环境（需要5-10分钟）
-3. 解压完成后，应用会自动启动
-
-## 系统要求
-
-- Windows 10/11 (64位)
-- 至少 20GB 可用磁盘空间
-- Visual C++ Redistributable 2015-2022
-  - 下载: https://aka.ms/vs/17/release/vc_redist.x64.exe
-
-## 文件说明
-
-- `StableDiffusionWebUI.exe` - 主程序
-- `environment/venv.7z` - Python环境包（首次运行自动解压）
-- `_internal/` - 应用内部文件
-
-## 注意事项
-
-- 首次运行需要解压环境，请耐心等待
-- 解压后的venv目录约8GB，请确保有足够空间
-- 如果解压失败，请检查磁盘空间和权限
-"""
-                    readme_file = dist_dir / "StableDiffusionWebUI" / "README.txt"
-                    readme_file.write_text(readme_content, encoding='utf-8')
-                    
-                    # 显示最终大小
-                    try:
-                        total_size = sum(
-                            f.stat().st_size
-                            for f in (dist_dir / "StableDiffusionWebUI").rglob('*')
-                            if f.is_file()
-                        )
-                        size_gb = total_size / (1024 * 1024 * 1024)
-                        size_mb = total_size / (1024 * 1024)
-                        print()
-                        print("=" * 60)
-                        print("✓ 完整分发包创建成功！")
-                        print("=" * 60)
-                        print(f"分发包大小: {size_gb:.2f} GB ({size_mb:.2f} MB)")
-                        print(f"位置: {dist_dir / 'StableDiffusionWebUI'}")
-                        print()
-                        print("包含内容:")
-                        print("  - 应用本身: ~600MB")
-                        print("  - 环境包 (venv.7z): ~3-4GB")
-                        print("  - 总计: ~4-5GB")
-                        print()
-                    except Exception as e:
-                        print(f"无法计算大小: {e}")
-                except subprocess.CalledProcessError as e:
-                    print(f"⚠ 创建环境包时出错: {e}")
-                    print("应用已打包完成，但未包含环境包")
-                    print("可以稍后手动运行: python create_environment_package.py")
-                except Exception as e:
-                    print(f"⚠ 处理环境包时出错: {e}")
-                    print("应用已打包完成，但未包含环境包")
-            else:
-                print("使用方法:")
-                print(f"  1. 进入目录: cd {dist_dir / 'StableDiffusionWebUI'}")
-                print("  2. 运行: StableDiffusionWebUI.exe")
-                print()
-                print("分发说明:")
-                print("  - 整个 StableDiffusionWebUI 文件夹可以复制到其他电脑使用")
-                print("  - 目标电脑需要安装 Visual C++ Redistributable 2015-2022")
-                print("  - 下载地址: https://aka.ms/vs/17/release/vc_redist.x64.exe")
-                print()
-                if not venv_path.exists():
-                    print("⚠ 注意: 未检测到venv环境")
-                    print("  当前打包只包含应用本身（~600MB）")
-                    print("  要实现开箱即用，请:")
-                    print("  1. 确保项目根目录有完整的venv环境")
-                    print("  2. 运行: python create_environment_package.py")
-                    print("  3. 将environment/venv.7z复制到dist目录")
-                print()
+            print("使用方法:")
+            print(f"  1. 进入目录: cd {dist_dir / 'StableDiffusionWebUI'}")
+            print("  2. 运行: StableDiffusionWebUI.exe")
+            print()
+            print("分发说明:")
+            print("  - 此构建仅包含桌面启动器和 UI 资源 (~200MB)")
+            print("  - 首次运行由向导负责下载 Python 环境、WebUI 核心与模型")
+            print("  - 目标电脑需要联网，并安装 Visual C++ Redistributable 2015-2022")
+            print("  - 下载地址: https://aka.ms/vs/17/release/vc_redist.x64.exe")
+            print()
+            print("如需离线分发，可单独提供向导使用的组件包 (python-env / webui-core / models)")
+            print("具体流程详见 README 中的“离线分发”章节。")
+            print()
         elif exe_path_single.exists():
             # 单文件模式 - 需要修复
             file_size_mb = exe_path_single.stat().st_size / (1024 * 1024)

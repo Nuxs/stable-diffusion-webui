@@ -59,34 +59,57 @@ class SystemDetector:
             "cuda_available": False,
             "cuda_version": None,
             "driver_version": None,
+            "gpu_count": 0,  # GPU 数量
+            "gpus": [],  # 所有 GPU 列表
         }
         
         # 尝试检测 NVIDIA GPU
         if shutil.which("nvidia-smi"):
             try:
-                # 查询 GPU 名称和显存
+                # 查询所有 GPU 的名称和显存
                 result = subprocess.run(
-                    ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+                    ["nvidia-smi", "--query-gpu=index,name,memory.total", "--format=csv,noheader"],
                     capture_output=True,
                     text=True,
                     timeout=5
                 )
                 if result.returncode == 0:
                     lines = result.stdout.strip().split('\n')
-                    if lines and lines[0]:
-                        parts = lines[0].split(', ')
-                        if len(parts) >= 2:
-                            gpu_info["vendor"] = "NVIDIA"
-                            gpu_info["name"] = parts[0].strip()
-                            # "12288 MiB" -> 12288
-                            vram_str = parts[1].strip().split()[0]
-                            gpu_info["vram"] = int(vram_str)
-                            gpu_info["vram_bytes"] = gpu_info["vram"] * 1024 * 1024
-                            gpu_info["cuda_available"] = True
-                            
+                    gpu_info["vendor"] = "NVIDIA"
+                    gpu_info["cuda_available"] = True
+                    
+                    for line in lines:
+                        if line.strip():
+                            parts = [p.strip() for p in line.split(',')]
+                            if len(parts) >= 3:
+                                gpu_index = int(parts[0])
+                                gpu_name = parts[1]
+                                vram_str = parts[2].split()[0]  # "12288 MiB" -> "12288"
+                                vram_mb = int(vram_str)
+                                
+                                gpu_info["gpus"].append({
+                                    "index": gpu_index,
+                                    "name": gpu_name,
+                                    "vram_mb": vram_mb,
+                                    "vram_gb": round(vram_mb / 1024, 1),
+                                })
+                    
+                    # 设置主显卡信息（使用第一块 GPU）
+                    if gpu_info["gpus"]:
+                        main_gpu = gpu_info["gpus"][0]
+                        gpu_info["name"] = main_gpu["name"]
+                        gpu_info["vram"] = main_gpu["vram_mb"]
+                        gpu_info["vram_bytes"] = main_gpu["vram_mb"] * 1024 * 1024
+                        gpu_info["gpu_count"] = len(gpu_info["gpus"])
+                        
+                        if gpu_info["gpu_count"] > 1:
+                            logger.info(f"检测到 {gpu_info['gpu_count']} 块 NVIDIA GPU")
+                            for gpu in gpu_info["gpus"]:
+                                logger.info(f"  [{gpu['index']}] {gpu['name']} ({gpu['vram_gb']} GB)")
+                        else:
                             logger.info(f"检测到 NVIDIA GPU: {gpu_info['name']}, 显存: {gpu_info['vram']} MB")
                 
-                # 检测 CUDA 版本
+                # 检测 CUDA 版本和驱动版本
                 cuda_result = subprocess.run(
                     ["nvidia-smi"],
                     capture_output=True,
@@ -109,11 +132,29 @@ class SystemDetector:
             except Exception as e:
                 logger.warning(f"检测 NVIDIA GPU 时出错: {e}")
         
-        # TODO: 检测 AMD GPU (使用 rocm-smi)
-        # TODO: 检测 Intel GPU
+        # 尝试检测 AMD GPU (使用 WMI on Windows)
+        if platform.system() == "Windows" and gpu_info["vendor"] is None:
+            try:
+                import wmi
+                c = wmi.WMI()
+                for gpu in c.Win32_VideoController():
+                    if "AMD" in gpu.Name or "Radeon" in gpu.Name:
+                        gpu_info["vendor"] = "AMD"
+                        gpu_info["name"] = gpu.Name
+                        # AMD 显存通常需要通过其他方式获取
+                        logger.info(f"检测到 AMD GPU: {gpu_info['name']}")
+                        break
+                    elif "Intel" in gpu.Name and gpu_info["vendor"] is None:
+                        # 如果没有其他GPU，记录Intel核显
+                        gpu_info["vendor"] = "Intel"
+                        gpu_info["name"] = gpu.Name
+            except ImportError:
+                logger.debug("未安装 wmi 模块，跳过 WMI GPU 检测")
+            except Exception as e:
+                logger.warning(f"通过 WMI 检测 GPU 时出错: {e}")
         
         if gpu_info["vendor"] is None:
-            logger.info("未检测到独立显卡")
+            logger.info("未检测到独立显卡，将使用 CPU 模式")
         
         return gpu_info
     
