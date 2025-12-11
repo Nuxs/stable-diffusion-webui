@@ -1,219 +1,170 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-运行环境管理器
-负责在不同来源之间解析符合要求的 Python 3.10 解释器
+环境管理器：处理venv环境的解压和设置
+用于分离式打包方案
 """
 
-from __future__ import annotations
-
-import logging
-import shutil
-import subprocess
+import os
 import sys
+import subprocess
+import shutil
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
-
-try:
-    from src.utils.runtime_state import load_runtime_state
-except ImportError:  # pragma: no cover - 打包场景
-    from utils.runtime_state import load_runtime_state
+from typing import Optional
+import logging
 
 logger = logging.getLogger(__name__)
 
 
 class EnvironmentManager:
-    """统一管理 Python 环境解析"""
-
-    REQUIRED_MAJOR = "3.10"
-    DEFAULT_RUNTIME_SUBDIR = "python-env"
-
-    def __init__(self, project_root: Path, data_dir: Path):
-        self.project_root = Path(project_root)
-        self.data_dir = Path(data_dir)
-        self.runtime_state = load_runtime_state(self.data_dir) or {}
-        self._python_exe: Optional[Path] = None
-        self._python_source: Optional[str] = None
-        self._checked_candidates: List[str] = []
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def refresh(self) -> None:
-        """重新读取运行时状态，清空缓存"""
-        self.runtime_state = load_runtime_state(self.data_dir) or {}
-        self._python_exe = None
-        self._python_source = None
-        self._checked_candidates.clear()
-
-    def get_python_executable(self) -> Path:
-        """返回满足要求的 Python 3.10 解释器路径"""
-        if self._python_exe and self._python_exe.exists():
-            return self._python_exe
-
-        python_path = self._resolve_python_executable()
-        if python_path:
-            self._python_exe = python_path
-            return python_path
-
-        raise RuntimeError(self._build_resolution_error())
-
-    def describe_source(self) -> Optional[str]:
-        """返回当前解析到的 Python 来源描述"""
-        return self._python_source
-
-    # ------------------------------------------------------------------
-    # Resolution helpers
-    # ------------------------------------------------------------------
-    def _resolve_python_executable(self) -> Optional[Path]:
-        resolvers = [
-            self._python_from_runtime_state,
-            self._python_from_data_dir,
-            self._python_from_project_venv,
-            self._python_from_sys_executable,
-            self._python_from_system_install,
-        ]
-
-        for resolver in resolvers:
-            resolved = resolver()
-            if resolved:
-                path, source = resolved
-                logger.info("✓ 使用 Python 解释器 (%s): %s", source, path)
-                self._python_source = source
-                return path
-
-        return None
-
-    def _python_from_runtime_state(self) -> Optional[Tuple[Path, str]]:
-        env_info = self.runtime_state.get("python_env") if isinstance(self.runtime_state, dict) else None
-        if not env_info:
-            return None
-
-        candidates: List[Path] = []
-        python_exe = env_info.get("python_exe")
-        env_path = env_info.get("path")
-
-        if python_exe:
-            candidates.append(Path(python_exe))
-        if env_path:
-            env_root = Path(env_path)
-            candidates.extend(self._expand_python_candidates(env_root))
-
-        return self._validate_candidates(candidates, source="runtime_state")
-
-    def _python_from_data_dir(self) -> Optional[Tuple[Path, str]]:
-        env_root = self.data_dir / self.DEFAULT_RUNTIME_SUBDIR
-        candidates = self._expand_python_candidates(env_root)
-        return self._validate_candidates(candidates, source="data_dir")
-
-    def _python_from_project_venv(self) -> Optional[Tuple[Path, str]]:
-        venv_root = self.project_root / "venv"
-        candidates = self._expand_python_candidates(venv_root)
-
-        # 兼容嵌套 _internal 目录
-        internal_root = self.project_root / "_internal" / "venv"
-        candidates.extend(self._expand_python_candidates(internal_root))
-
-        return self._validate_candidates(candidates, source="project_venv")
-
-    def _python_from_sys_executable(self) -> Optional[Tuple[Path, str]]:
-        current = Path(sys.executable)
-        return self._validate_candidates([current], source="current_process")
-
-    def _python_from_system_install(self) -> Optional[Tuple[Path, str]]:
-        candidates: List[Path] = []
-        # 常见的 Windows 安装目录
-        windows_paths = [
-            r"C:\\Python310\\python.exe",
-            r"C:\\Program Files\\Python310\\python.exe",
-            r"C:\\Program Files (x86)\\Python310\\python.exe",
-        ]
-        for path in windows_paths:
-            candidates.append(Path(path))
-
-        # POSIX 平台
-        posix_paths = [
-            Path("/usr/bin/python3.10"),
-            Path("/usr/local/bin/python3.10"),
-        ]
-        candidates.extend(posix_paths)
-
-        which_python = shutil.which("python3.10")
-        if which_python:
-            candidates.append(Path(which_python))
-
-        return self._validate_candidates(candidates, source="system")
-
-    # ------------------------------------------------------------------
-    # Candidate utilities
-    # ------------------------------------------------------------------
-    def _expand_python_candidates(self, env_root: Path) -> List[Path]:
-        candidates: List[Path] = []
-        if not env_root:
-            return candidates
-
-        if sys.platform == "win32":
-            candidates.append(env_root / "Scripts" / "python.exe")
-            candidates.append(env_root / "python.exe")
+    """环境管理器"""
+    
+    def __init__(self, app_dir: Path):
+        """
+        初始化环境管理器
+        
+        Args:
+            app_dir: 应用目录（exe所在目录）
+        """
+        self.app_dir = Path(app_dir)
+        self.venv_dir = self.app_dir / "venv"
+        # 支持.7z和.zip两种格式
+        env_dir = self.app_dir / "environment"
+        if (env_dir / "venv.7z").exists():
+            self.env_package = env_dir / "venv.7z"
+        elif (env_dir / "venv.zip").exists():
+            self.env_package = env_dir / "venv.zip"
         else:
-            candidates.append(env_root / "bin" / "python3.10")
-            candidates.append(env_root / "bin" / "python")
-            candidates.append(env_root / "python3.10")
-
-        return candidates
-
-    def _validate_candidates(self, candidates: Sequence[Path], source: str) -> Optional[Tuple[Path, str]]:
-        for candidate in candidates:
-            if not candidate:
-                continue
-            candidate = candidate.resolve()
-            if str(candidate) in self._checked_candidates:
-                continue
-            self._checked_candidates.append(str(candidate))
-
-            if not candidate.exists():
-                continue
-
-            version = self._read_python_version(candidate)
-            if not version:
-                continue
-
-            if self.REQUIRED_MAJOR in version:
-                return candidate, source
-
-            logger.warning("忽略 Python %s (来源 %s)，未匹配 %s", version.strip(), source, self.REQUIRED_MAJOR)
-
+            self.env_package = env_dir / "venv.7z"  # 默认
+        self.python_exe = self.venv_dir / "Scripts" / "python.exe"
+        
+    def is_environment_ready(self) -> bool:
+        """检查环境是否已准备好"""
+        return self.python_exe.exists()
+    
+    def extract_environment(self) -> bool:
+        """解压环境包"""
+        if not self.env_package.exists():
+            logger.error(f"环境包不存在: {self.env_package}")
+            return False
+        
+        if self.venv_dir.exists():
+            logger.warning(f"venv目录已存在: {self.venv_dir}")
+            response = input("是否删除现有环境并重新解压? (y/n): ")
+            if response.lower() != 'y':
+                return False
+            shutil.rmtree(self.venv_dir)
+        
+        logger.info(f"开始解压环境包: {self.env_package}")
+        logger.info(f"目标目录: {self.venv_dir}")
+        logger.info("这可能需要5-10分钟，请耐心等待...")
+        
+        # 检查7z是否可用
+        if self._check_7zip():
+            return self._extract_with_7zip()
+        else:
+            # 使用Python的zipfile（如果7z不可用，尝试其他方法）
+            logger.warning("7z不可用，尝试其他解压方法...")
+            return self._extract_with_python()
+    
+    def _check_7zip(self) -> bool:
+        """检查7-Zip是否可用"""
+        try:
+            result = subprocess.run(['7z'], capture_output=True, text=True, timeout=5)
+            return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+    
+    def _extract_with_7zip(self) -> bool:
+        """使用7z解压"""
+        try:
+            cmd = ['7z', 'x', str(self.env_package), f'-o{self.app_dir}', '-y']
+            result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+            logger.info("✓ 环境解压完成")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"解压失败: {e}")
+            logger.error(f"错误输出: {e.stderr}")
+            return False
+    
+    def _extract_with_python(self) -> bool:
+        """使用Python解压（备用方案）"""
+        # 如果是.7z格式，尝试使用py7zr
+        if self.env_package.suffix == '.7z':
+            try:
+                import py7zr
+                logger.info("使用py7zr解压7z文件...")
+                with py7zr.SevenZipFile(self.env_package, mode='r') as archive:
+                    archive.extractall(path=self.app_dir)
+                logger.info("✓ 环境解压完成")
+                return True
+            except ImportError:
+                logger.warning("py7zr未安装，尝试使用zipfile...")
+            except Exception as e:
+                logger.error(f"py7zr解压失败: {e}")
+        
+        # 如果是.zip格式或py7zr不可用，使用zipfile
+        if self.env_package.suffix == '.zip':
+            try:
+                import zipfile
+                logger.info("使用zipfile解压zip文件...")
+                with zipfile.ZipFile(self.env_package, 'r') as zipf:
+                    zipf.extractall(path=self.app_dir)
+                logger.info("✓ 环境解压完成")
+                return True
+            except Exception as e:
+                logger.error(f"zipfile解压失败: {e}")
+                return False
+        
+        # 如果都不行，提示用户
+        logger.error("无法解压环境包")
+        logger.error("请安装以下工具之一：")
+        logger.error("1. 7-Zip: https://www.7-zip.org/")
+        logger.error("2. 或安装py7zr: pip install py7zr")
+        logger.error("")
+        logger.error("或者手动解压:")
+        logger.error(f"  将 {self.env_package} 解压到 {self.app_dir}")
+        return False
+    
+    def setup_environment(self) -> bool:
+        """设置环境（解压并验证）"""
+        if self.is_environment_ready():
+            logger.info("环境已准备好")
+            return True
+        
+        logger.info("环境未准备好，开始解压...")
+        if not self.extract_environment():
+            return False
+        
+        # 验证环境
+        if not self.is_environment_ready():
+            logger.error("环境解压后验证失败")
+            return False
+        
+        logger.info("✓ 环境设置完成")
+        return True
+    
+    def get_python_exe(self) -> Optional[Path]:
+        """获取Python解释器路径"""
+        if self.is_environment_ready():
+            return self.python_exe
         return None
 
-    def _read_python_version(self, python_path: Path) -> Optional[str]:
-        try:
-            result = subprocess.run(
-                [str(python_path), "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            output = (result.stdout or result.stderr or "").strip()
-            if not output:
-                return None
-            return output
-        except (OSError, subprocess.SubprocessError) as exc:
-            logger.debug("读取 Python 版本失败 %s: %s", python_path, exc)
-            return None
 
-    # ------------------------------------------------------------------
-    # Error helpers
-    # ------------------------------------------------------------------
-    def _build_resolution_error(self) -> str:
-        checked = "\n".join(f"  - {path}" for path in self._checked_candidates)
-        message = [
-            "未找到可用的 Python 3.10 解释器。",
-            "请确认以下任一条件已满足:",
-            "1. 首次运行向导已经完成，并在 data/python-env 中准备好 Python", 
-            "2. stable-diffusion-webui 根目录下存在 venv (Python 3.10)",
-            "3. 系统已安装 Python 3.10 并可通过 python3.10 访问",
-        ]
-        if checked:
-            message.append("\n已检查的候选路径:\n" + checked)
-        return "\n".join(message)
+def setup_runtime_environment(app_dir: Path) -> Optional[Path]:
+    """
+    设置运行时环境
+    
+    Args:
+        app_dir: 应用目录
+        
+    Returns:
+        Python解释器路径，如果设置失败返回None
+    """
+    manager = EnvironmentManager(app_dir)
+    
+    if not manager.setup_environment():
+        return None
+    
+    return manager.get_python_exe()
+

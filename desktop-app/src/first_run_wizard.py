@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Dict, Optional
 from PyQt6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QLabel,
     QRadioButton, QCheckBox, QTextEdit, QProgressBar, QGroupBox,
@@ -15,10 +15,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
-
-from src.webui_manager import WebUIManager
-from src.utils.config import Config
-from src.utils.runtime_state import save_runtime_state
 
 logger = logging.getLogger(__name__)
 
@@ -460,13 +456,6 @@ class DownloadThread(QThread):
         super().__init__()
         self.selections = selections
         self.data_dir = data_dir
-        self._is_cancelled = False
-        self.runtime_state: Dict[str, Any] = {}
-    
-    def cancel(self):
-        """取消下载"""
-        self._is_cancelled = True
-        logger.info("用户取消下载")
     
     def run(self):
         """执行下载"""
@@ -485,7 +474,6 @@ class DownloadThread(QThread):
             cache_dir = self.data_dir.parent / "cache"
             dm = DownloadManager(cache_dir)
             
-            # 计算总步骤
             total_steps = 2  # Python环境 + WebUI核心
             if self.selections["models"]["sd-v1-5"] or self.selections["models"]["sdxl-base"]:
                 total_steps += 1
@@ -493,10 +481,6 @@ class DownloadThread(QThread):
             current_step = 0
             
             # 1. 安装 Python 环境
-            if self._is_cancelled:
-                self.finished.emit(False, "用户取消")
-                return
-            
             self.log_message.emit("=" * 50)
             self.log_message.emit("步骤 1: 设置 Python 环境")
             self.log_message.emit("=" * 50)
@@ -506,52 +490,24 @@ class DownloadThread(QThread):
             ppm = PortablePythonManager(self.data_dir, dm)
             
             def env_progress(step, curr, total):
-                if self._is_cancelled:
-                    raise InterruptedError("用户取消下载")
                 self.current_task.emit(f"Python 环境 - {step}")
                 self.log_message.emit(f"  [{curr}/{total}] {step}")
             
-            try:
-                if not ppm.setup_environment(self.selections["python_env"], env_progress):
-                    self.finished.emit(False, "Python 环境设置失败")
-                    return
-            except InterruptedError as e:
-                self.finished.emit(False, str(e))
-                return
-            self.runtime_state["python_env"] = ppm.get_environment_state()
-            
-            # 2. 准备 WebUI 核心
-            if self._is_cancelled:
-                self.finished.emit(False, "用户取消")
+            if not ppm.setup_environment(self.selections["python_env"], env_progress):
+                self.finished.emit(False, "Python 环境设置失败")
                 return
             
+            # 2. 下载 WebUI 核心（暂时跳过，因为需要从 GitHub 下载）
             self.log_message.emit("\n" + "=" * 50)
             self.log_message.emit("步骤 2: 准备 WebUI 核心文件")
             self.log_message.emit("=" * 50)
             current_step += 1
             self.overall_progress.emit(current_step, total_steps)
             self.current_task.emit("WebUI 核心文件")
-
-            webui_manager = WebUIManager(self.data_dir, dm)
-
-            def webui_progress(current: int, total: int):
-                if self._is_cancelled:
-                    raise InterruptedError("用户取消下载")
-                self.progress_updated.emit(current, total)
-
-            webui_path = webui_manager.ensure_latest(webui_progress)
-            self.runtime_state["webui"] = {
-                "version": webui_manager.get_required_version().get("version"),
-                "path": str(webui_path),
-            }
-            self.log_message.emit("  ✓ WebUI 核心准备完成")
+            self.log_message.emit("  WebUI 核心文件已包含在应用中")
             
             # 3. 下载模型
             if self.selections["models"]["sd-v1-5"] or self.selections["models"]["sdxl-base"]:
-                if self._is_cancelled:
-                    self.finished.emit(False, "用户取消")
-                    return
-                
                 self.log_message.emit("\n" + "=" * 50)
                 self.log_message.emit("步骤 3: 下载 AI 模型")
                 self.log_message.emit("=" * 50)
@@ -559,13 +515,8 @@ class DownloadThread(QThread):
                 self.overall_progress.emit(current_step, total_steps)
                 
                 mm = ModelManager(self.data_dir, dm)
-                installed_models: List[str] = []
                 
                 for model_id, selected in self.selections["models"].items():
-                    if self._is_cancelled:
-                        self.finished.emit(False, "用户取消")
-                        return
-                    
                     if selected:
                         model_info = mm.get_model_info(model_id)
                         if model_info:
@@ -573,65 +524,23 @@ class DownloadThread(QThread):
                             self.log_message.emit(f"  下载 {model_info['name']}...")
                             
                             def model_progress(current, total):
-                                if self._is_cancelled:
-                                    raise InterruptedError("用户取消下载")
                                 self.progress_updated.emit(current, total)
                             
-                            try:
-                                result = mm.download_model(model_id, model_progress)
-                                if result:
-                                    self.log_message.emit(f"  ✓ {model_info['name']} 下载完成")
-                                    installed_models.append(model_id)
-                                else:
-                                    self.log_message.emit(f"  ✗ {model_info['name']} 下载失败（可稍后手动下载）")
-                            except InterruptedError:
-                                self.finished.emit(False, "用户取消")
-                                return
-                            except Exception as e:
-                                logger.error(f"下载模型出错: {e}")
-                                self.log_message.emit(f"  ✗ {model_info['name']} 下载出错: {e}")
-                                # 模型下载失败不影响整体流程
-
-                if installed_models:
-                    self.runtime_state["models"] = installed_models
+                            result = mm.download_model(model_id, model_progress)
+                            if result:
+                                self.log_message.emit(f"  ✓ {model_info['name']} 下载完成")
+                            else:
+                                self.log_message.emit(f"  ✗ {model_info['name']} 下载失败")
             
             self.log_message.emit("\n" + "=" * 50)
             self.log_message.emit("✓ 所有组件安装完成!")
             self.log_message.emit("=" * 50)
-            self._persist_runtime_state()
             self.finished.emit(True, "")
             
-        except InterruptedError:
-            self.finished.emit(False, "用户取消")
         except Exception as e:
             logger.error(f"下载过程出错: {e}", exc_info=True)
             self.log_message.emit(f"\n✗ 错误: {e}")
-            # 提供更友好的错误信息
-            error_msg = self._get_friendly_error_message(e)
-            self.finished.emit(False, error_msg)
-    
-    def _get_friendly_error_message(self, exception: Exception) -> str:
-        """将异常转换为用户友好的错误信息"""
-        error_str = str(exception).lower()
-        
-        if "connection" in error_str or "网络" in error_str:
-            return "网络连接失败，请检查您的网络连接后重试"
-        elif "timeout" in error_str or "超时" in error_str:
-            return "下载超时，请检查网络连接或稍后重试"
-        elif "disk" in error_str or "space" in error_str or "磁盘" in error_str:
-            return "磁盘空间不足，请清理磁盘后重试"
-        elif "permission" in error_str or "权限" in error_str:
-            return "权限不足，请尝试以管理员身份运行"
-        else:
-            return f"安装失败: {exception}"
-    
-    def _persist_runtime_state(self) -> None:
-        if not self.runtime_state:
-            return
-        save_runtime_state(self.data_dir, self.runtime_state)
-        if "webui" in self.runtime_state:
-            config = Config()
-            config.set("webui_project_path", self.runtime_state["webui"].get("path"))
+            self.finished.emit(False, str(e))
 
 
 if __name__ == "__main__":

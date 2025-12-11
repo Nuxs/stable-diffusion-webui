@@ -92,12 +92,91 @@ if os.path.exists(resources_path):
                 rel_path = os.path.relpath(src_path, resources_path)
                 datas.append((src_path, os.path.join('resources', os.path.dirname(rel_path)) if os.path.dirname(rel_path) else 'resources'))
 
-# 仅打包桌面应用自身所需的静态资源
-# WebUI 核心与 Python 环境改由首次运行时在线下载
-print("桌面应用构建：仅包含 PyQt6 壳、配置与资源")
-print("WebUI 核心 / Python 环境 / 模型将由首次运行向导拉取")
+# 添加 stable-diffusion-webui 项目核心文件
+# 项目根目录是 desktop-app 的父目录
+project_root = os.path.dirname(spec_dir)
+print(f"项目根目录: {project_root}")
 
-print(f"已添加 {len([d for d in datas if isinstance(d, tuple) and len(d) == 2])} 个 PyQt6/资源文件到打包列表")
+# 需要排除的目录和文件
+exclude_dirs = {
+    '__pycache__', '.git', 'node_modules',
+    'models', 'outputs', 'cache', 'tmp', 'logs',
+    'desktop-app', 'build', 'dist', '.idea', '.vscode',
+    'repositories'  # repositories 目录通常很大，可以排除
+    # 注意：venv 不在排除列表中，因为我们希望打包它
+}
+
+exclude_files = {
+    '.gitignore', '.gitattributes', '.gitmodules'
+}
+
+# 需要打包的核心目录和文件
+core_dirs = [
+    'modules', 'scripts', 'javascript', 'html', 'configs',
+    'extensions-builtin', 'textual_inversion_templates',
+    'localizations', 'test'
+]
+
+core_files = [
+    'launch.py', 'webui.py', 'webui.bat', 'webui.sh', 'webui-user.bat',
+    'webui-user.sh', 'webui-macos-env.sh', 'requirements.txt',
+    'requirements_versions.txt', 'requirements_npu.txt', 'requirements-test.txt',
+    'package.json', 'pyproject.toml', 'LICENSE.txt', 'README.md',
+    'CHANGELOG.md', 'CITATION.cff', 'CODEOWNERS', 'params.txt',
+    'config.json', 'ui-config.json', 'style.css', 'script.js',
+    'screenshot.png', '_typos.toml'
+]
+
+# 打包核心目录
+for core_dir in core_dirs:
+    core_dir_path = os.path.join(project_root, core_dir)
+    if os.path.exists(core_dir_path):
+        for root, dirs, files in os.walk(core_dir_path):
+            # 过滤掉排除的目录
+            dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
+            
+            for file in files:
+                if file not in exclude_files and not file.startswith('.'):
+                    src_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_path, project_root)
+                    datas.append((src_path, os.path.dirname(rel_path) if os.path.dirname(rel_path) != '.' else '.'))
+        print(f"已添加目录: {core_dir}")
+
+# 打包核心文件
+for core_file in core_files:
+    core_file_path = os.path.join(project_root, core_file)
+    if os.path.exists(core_file_path):
+        datas.append((core_file_path, '.'))
+        print(f"已添加文件: {core_file}")
+
+# 打包其他重要目录（如果存在）
+other_dirs = ['embeddings', 'extensions', 'config_states']
+for other_dir in other_dirs:
+    other_dir_path = os.path.join(project_root, other_dir)
+    if os.path.exists(other_dir_path):
+        for root, dirs, files in os.walk(other_dir_path):
+            dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
+            for file in files:
+                if file not in exclude_files and not file.startswith('.'):
+                    src_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_path, project_root)
+                    datas.append((src_path, os.path.dirname(rel_path) if os.path.dirname(rel_path) != '.' else '.'))
+        print(f"已添加目录: {other_dir}")
+
+# 注意：venv环境不直接打包，使用分离式打包方案
+# venv将被压缩为7z格式，放在environment/venv.7z
+# 应用首次运行时会自动解压
+print("=" * 60)
+print("分离式打包方案")
+print("=" * 60)
+print("venv环境不直接打包到exe中（体积过大）")
+print("请使用以下步骤创建完整分发包：")
+print("1. 运行: python create_environment_package.py 创建环境包")
+print("2. 将 environment/venv.7z 复制到打包输出目录")
+print("3. 应用首次运行时会自动解压环境")
+print("=" * 60)
+
+print(f"已添加 {len([d for d in datas if isinstance(d, tuple) and len(d) == 2])} 个文件/目录到打包列表")
 
 # 添加额外的隐藏导入
 hiddenimports += [

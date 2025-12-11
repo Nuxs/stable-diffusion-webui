@@ -26,37 +26,19 @@ class DownloadError(Exception):
 class DownloadManager:
     """下载管理器"""
     
-    # 默认配置
-    MAX_RETRIES = 3  # 每个URL的最大重试次数
-    CHUNK_SIZE = 8192  # 下载块大小
-    TIMEOUT = 30  # 请求超时时间（秒）
-    CONNECT_TIMEOUT = 10  # 连接超时时间（秒）
-    PROGRESS_UPDATE_INTERVAL = 0.5  # 进度更新间隔（秒）
-    
-    def __init__(self, cache_dir: Path, max_retries: int = MAX_RETRIES):
+    def __init__(self, cache_dir: Path):
         """
         初始化下载管理器
         
         Args:
             cache_dir: 缓存目录，用于存放下载的文件
-            max_retries: 最大重试次数
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.max_retries = max_retries
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
-        
-        # 配置连接池
-        adapter = requests.adapters.HTTPAdapter(
-            pool_connections=10,
-            pool_maxsize=20,
-            max_retries=0  # 我们自己处理重试
-        )
-        self.session.mount('http://', adapter)
-        self.session.mount('https://', adapter)
     
     def download_file(self,
                       url: str,
@@ -111,62 +93,32 @@ class DownloadManager:
             urls_to_try.extend(mirrors)
         
         last_error = None
-        for url_index, attempt_url in enumerate(urls_to_try):
-            # 每个URL尝试多次
-            for retry in range(self.max_retries):
-                try:
-                    retry_info = f" (重试 {retry + 1}/{self.max_retries})" if retry > 0 else ""
-                    url_info = f" (镜像 {url_index + 1}/{len(urls_to_try)})" if url_index > 0 else ""
-                    logger.info(f"开始下载{url_info}{retry_info}: {attempt_url}")
-                    
-                    self._download_with_resume(
-                        url=attempt_url,
-                        output_path=output_path,
-                        expected_size=expected_size,
-                        progress_callback=progress_callback
-                    )
-                    
-                    # 验证下载的文件
-                    if not self._verify_file(output_path, expected_size, expected_md5):
-                        raise DownloadError("文件校验失败")
-                    
-                    logger.info(f"下载成功: {output_path}")
-                    return output_path
-                    
-                except requests.exceptions.RequestException as e:
-                    last_error = e
-                    error_type = type(e).__name__
-                    logger.warning(f"下载出错 ({error_type}): {e}")
-                    
-                    # 清理不完整的文件
-                    temp_path = output_path.with_suffix(output_path.suffix + '.part')
-                    if retry == self.max_retries - 1:  # 最后一次尝试失败，清理临时文件
-                        if temp_path.exists():
-                            temp_path.unlink()
-                    
-                    # 如果不是最后一次重试，等待后重试
-                    if retry < self.max_retries - 1:
-                        wait_time = (retry + 1) * 2  # 递增等待时间：2秒、4秒、6秒...
-                        logger.info(f"等待 {wait_time} 秒后重试...")
-                        time.sleep(wait_time)
-                    
-                except Exception as e:
-                    last_error = e
-                    logger.error(f"下载失败: {e}", exc_info=True)
-                    
-                    # 清理文件
-                    if output_path.exists():
-                        output_path.unlink()
-                    temp_path = output_path.with_suffix(output_path.suffix + '.part')
-                    if temp_path.exists():
-                        temp_path.unlink()
-                    break  # 其他类型的错误不重试，直接尝试下一个URL
+        for attempt_url in urls_to_try:
+            try:
+                logger.info(f"开始下载: {attempt_url}")
+                self._download_with_resume(
+                    url=attempt_url,
+                    output_path=output_path,
+                    expected_size=expected_size,
+                    progress_callback=progress_callback
+                )
+                
+                # 验证下载的文件
+                if not self._verify_file(output_path, expected_size, expected_md5):
+                    raise DownloadError("文件校验失败")
+                
+                logger.info(f"下载成功: {output_path}")
+                return output_path
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"从 {attempt_url} 下载失败: {e}")
+                if output_path.exists():
+                    output_path.unlink()
+                continue
         
         # 所有 URL 都失败了
-        error_msg = f"下载失败，已尝试 {len(urls_to_try)} 个URL，每个URL重试 {self.max_retries} 次"
-        if last_error:
-            error_msg += f"\\n最后的错误: {last_error}"
-        raise DownloadError(error_msg)
+        raise DownloadError(f"下载失败，已尝试 {len(urls_to_try)} 个URL: {last_error}")
     
     def _download_with_resume(self,
                               url: str,
@@ -181,10 +133,6 @@ class DownloadManager:
             output_path: 输出路径
             expected_size: 预期文件大小
             progress_callback: 进度回调
-        
-        Raises:
-            requests.exceptions.RequestException: 网络请求错误
-            IOError: 文件操作错误
         """
         # 检查是否支持断点续传
         temp_path = output_path.with_suffix(output_path.suffix + '.part')
@@ -200,26 +148,16 @@ class DownloadManager:
         if downloaded_size > 0:
             headers['Range'] = f'bytes={downloaded_size}-'
         
-        response = None
         try:
-            # 设置分开的连接和读取超时
-            response = self.session.get(
-                url,
-                headers=headers,
-                stream=True,
-                timeout=(self.CONNECT_TIMEOUT, self.TIMEOUT)
-            )
+            response = self.session.get(url, headers=headers, stream=True, timeout=30)
             response.raise_for_status()
             
             # 检查是否支持断点续传
-            if downloaded_size > 0:
-                if response.status_code == 206:
-                    logger.info(f"服务器支持断点续传，从 {downloaded_size} 字节继续")
-                else:
-                    logger.warning("服务器不支持断点续传，重新下载")
-                    downloaded_size = 0
-                    if temp_path.exists():
-                        temp_path.unlink()
+            if downloaded_size > 0 and response.status_code != 206:
+                logger.warning("服务器不支持断点续传，重新下载")
+                downloaded_size = 0
+                if temp_path.exists():
+                    temp_path.unlink()
             
             # 获取总大小
             total_size = downloaded_size
@@ -229,47 +167,22 @@ class DownloadManager:
             elif expected_size:
                 total_size = expected_size
             
-            logger.info(f"文件大小: {total_size} 字节 (已下载: {downloaded_size})")
-            
             # 下载文件
             mode = 'ab' if downloaded_size > 0 else 'wb'
             with open(temp_path, mode) as f:
                 start_time = time.time()
                 last_update_time = start_time
-                last_downloaded_size = downloaded_size
                 
-                try:
-                    for chunk in response.iter_content(chunk_size=self.CHUNK_SIZE):
-                        if chunk:
-                            f.write(chunk)
-                            downloaded_size += len(chunk)
-                            
-                            # 更新进度
-                            current_time = time.time()
-                            time_since_update = current_time - last_update_time
-                            
-                            if progress_callback and (
-                                time_since_update >= self.PROGRESS_UPDATE_INTERVAL or 
-                                downloaded_size >= total_size
-                            ):
-                                progress_callback(downloaded_size, total_size if total_size > 0 else downloaded_size)
-                                
-                                # 计算下载速度
-                                bytes_since_update = downloaded_size - last_downloaded_size
-                                speed = bytes_since_update / time_since_update if time_since_update > 0 else 0
-                                speed_mb = speed / (1024 * 1024)
-                                
-                                if speed_mb > 0.1:  # 只在速度大于 0.1 MB/s 时记录
-                                    logger.debug(f"下载速度: {speed_mb:.2f} MB/s")
-                                
-                                last_update_time = current_time
-                                last_downloaded_size = downloaded_size
-                    
-                except (requests.exceptions.ChunkedEncodingError, 
-                        requests.exceptions.ConnectionError) as e:
-                    # 这些错误可以通过断点续传恢复
-                    logger.warning(f"下载中断: {e}")
-                    raise
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_size += len(chunk)
+                        
+                        # 更新进度（每 0.5 秒更新一次）
+                        current_time = time.time()
+                        if progress_callback and (current_time - last_update_time >= 0.5 or downloaded_size >= total_size):
+                            progress_callback(downloaded_size, total_size if total_size > 0 else downloaded_size)
+                            last_update_time = current_time
             
             # 下载完成，重命名文件
             if output_path.exists():
@@ -280,18 +193,13 @@ class DownloadManager:
             if progress_callback:
                 progress_callback(downloaded_size, downloaded_size)
             
-            # 统计信息
             elapsed_time = time.time() - start_time
             speed_mbps = (downloaded_size / (1024 * 1024)) / elapsed_time if elapsed_time > 0 else 0
-            logger.info(
-                f"下载完成: {downloaded_size} 字节, "
-                f"耗时: {elapsed_time:.1f}秒, "
-                f"平均速度: {speed_mbps:.2f} MB/s"
-            )
+            logger.info(f"下载完成: {downloaded_size} 字节, 耗时: {elapsed_time:.1f}秒, 速度: {speed_mbps:.2f} MB/s")
             
-        finally:
-            if response:
-                response.close()
+        except Exception as e:
+            logger.error(f"下载出错: {e}")
+            raise
     
     def _verify_file(self,
                      file_path: Path,

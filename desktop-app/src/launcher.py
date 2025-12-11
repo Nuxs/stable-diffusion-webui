@@ -241,7 +241,7 @@ class SmartLauncher:
         
         # 创建主窗口
         try:
-            window = MainWindow(self.project_root, self.data_dir)
+            window = MainWindow(self.project_root)
             window.show()
             logger.info("应用程序启动成功")
             

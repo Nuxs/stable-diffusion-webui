@@ -179,14 +179,10 @@ if getattr(sys, 'frozen', False):
             print(f"警告: 在打包模式下未找到 launch.py 或 webui.py，使用 {project_root} 作为项目根目录")
     
     desktop_app_root = exe_dir  # 在打包模式下，desktop-app 目录可能不存在
-    data_dir = exe_dir / "data"
 else:
     # 开发模式：使用原来的逻辑
     project_root = Path(__file__).parent.parent.parent
     desktop_app_root = Path(__file__).parent.parent
-    data_dir = desktop_app_root / "data"
-
-data_dir.mkdir(parents=True, exist_ok=True)
 
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(desktop_app_root))
@@ -224,7 +220,7 @@ def main():
     
     # 创建主窗口
     try:
-        window = MainWindow(project_root, data_dir)
+        window = MainWindow(project_root)
         window.show()
         logger.info("应用程序启动成功")
         
